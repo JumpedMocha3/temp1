@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body { font-family: Arial; max-width: 400px; margin: 0 auto; padding: 20px; }
+    input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+    button { background-color: #4285f4; color: white; padding: 10px; border: none; width: 100%; }
+    .error { color: red; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Login</h2>
+  <input type="text" id="username" placeholder="Username" required>
+  <input type="password" id="password" placeholder="Password" required>
+  <button onclick="login()">Login</button>
+  <div id="error" class="error"></div>
+
+  <script>
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      google.script.run
+        .withSuccessHandler(function(user) {
+          if (user.role === 'admin') window.location.href = 'admin.html';
+          else window.location.href = 'worker.html';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('error').textContent = error.message;
+        })
+        .verifyUser(username, password);
+    }
+  </script>
+</body>
+</html>
