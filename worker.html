@@ -2,99 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Worker Dashboard</title>
 </head>
 <body>
-  <h1>Submit Purchase Request</h1>
+  <h1>Worker Dashboard</h1>
+  <p>Welcome, Worker!</p>
 
-  <input type="text" id="workerName" placeholder="Your Name"><br>
-  <input type="text" id="projectName" placeholder="Project Name"><br>
+  <button onclick="createRequest()">Create Purchase Request</button>
 
-  <div id="itemsList">
-    <div class="item">
-      <input type="number" step="0.001" placeholder="Quantity" class="quantity">
-      <input type="text" placeholder="Units" class="units">
-      <input type="text" placeholder="Item Name" class="itemName">
-    </div>
-  </div>
-
-  <button onclick="addItem()">Add Another Item</button><br><br>
-  <button onclick="submitRequest()">Submit Request</button>
-
-  <h2>Your Requests</h2>
-  <div id="yourRequests"></div>
-
-  <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { collection, addDoc, query, where, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-    function addItem() {
-      const container = document.createElement('div');
-      container.className = 'item';
-      container.innerHTML = `
-        <input type="number" step="0.001" placeholder="Quantity" class="quantity">
-        <input type="text" placeholder="Units" class="units">
-        <input type="text" placeholder="Item Name" class="itemName">
-      `;
-      document.getElementById('itemsList').appendChild(container);
+  <script>
+    function createRequest() {
+      // Functionality to create a purchase request form will go here.
+      alert("Create Purchase Request here");
     }
-
-    async function submitRequest() {
-      const workerName = document.getElementById('workerName').value;
-      const projectName = document.getElementById('projectName').value;
-
-      const items = [];
-      document.querySelectorAll('.item').forEach(item => {
-        const quantity = parseFloat(item.querySelector('.quantity').value);
-        const units = item.querySelector('.units').value;
-        const itemName = item.querySelector('.itemName').value;
-        if (!isNaN(quantity) && units && itemName) {
-          items.push({ quantity, units, itemName });
-        }
-      });
-
-      if (items.length === 0) {
-        alert('Please add at least one item.');
-        return;
-      }
-
-      await addDoc(collection(db, "requests"), {
-        workerName,
-        projectName,
-        items,
-        status: "pending",
-        timestamp: new Date()
-      });
-
-      alert('Request submitted!');
-      location.reload();
-    }
-
-    function loadRequests(userEmail) {
-      const q = query(collection(db, "requests"), where("workerName", "==", userEmail));
-      onSnapshot(q, (snapshot) => {
-        const container = document.getElementById('yourRequests');
-        container.innerHTML = '';
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const div = document.createElement('div');
-          div.innerHTML = `
-            <p>Project: ${data.projectName}</p>
-            <p>Status: ${data.status}</p>
-            ${data.reason ? `<p>Decline Reason: ${data.reason}</p>` : ""}
-            <hr>
-          `;
-          container.appendChild(div);
-        });
-      });
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loadRequests(user.email);
-      }
-    });
   </script>
 </body>
 </html>
