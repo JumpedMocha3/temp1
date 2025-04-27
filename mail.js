@@ -1,5 +1,12 @@
 const firebaseConfig = {
-  //   copy your firebase config informations
+  apiKey: "AIzaSyA5h26hiZRX2WA3tRCjUY2NlA6rnRV0E24",
+  authDomain: "namozag-3b281.firebaseapp.com",
+  databaseURL: "https://namozag-3b281-default-rtdb.firebaseio.com",
+  projectId: "namozag-3b281",
+  storageBucket: "namozag-3b281.firebasestorage.app",
+  messagingSenderId: "183249580094",
+  appId: "1:183249580094:web:af1070013478332698616f",
+  measurementId: "G-CE1RNHKMQG"
 };
 
 // initialize firebase
