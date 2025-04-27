@@ -11,59 +11,9 @@
   <input type="email" id="email" placeholder="Email" required>
   <input type="password" id="password" placeholder="Password" required>
   
-  <button onclick="signup()">Sign Up</button>
-  <button onclick="login()">Login</button>
+  <button id="signupBtn">Sign Up</button>
+  <button id="loginBtn">Login</button>
 
-  <!-- Place the script here at the bottom -->
-  <script type="module">
-    // Import Firebase config from GitHub raw URL
-    import { auth, db } from 'https://raw.githubusercontent.com/JumpedMocha3/temp1/main/firebase-config.js';
-    
-    import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-    import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-    async function signup() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        console.log('User created:', user.uid);
-
-        // Save user info in Firestore
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          role: user.email === "admin@gmail.com" ? "admin" : "worker",
-          createdAt: new Date()
-        });
-
-        alert('Sign up successful! Please log in.');
-      } catch (error) {
-        console.error(error);
-        alert(error.message);
-      }
-    }
-
-    async function login() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        // Redirect user based on their role
-        if (user.email === "admin@gmail.com") {
-          window.location.href = "admin.html";  // Admin page
-        } else {
-          window.location.href = "worker.html";  // Worker page
-        }
-      } catch (error) {
-        alert(error.message);
-      }
-    }
-  </script>
+  <script type="module" src="app.js"></script>  <!-- Link to external JS file -->
 </body>
 </html>
