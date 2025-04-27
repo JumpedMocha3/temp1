@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Worker Dashboard</title>
+  <style>
+    body { font-family: Arial; margin: 0; }
+    .header { background: #4285f4; color: white; padding: 10px 20px; display: flex; justify-content: space-between; }
+    .container { padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    button { background: #4285f4; color: white; border: none; padding: 8px; margin: 5px 0; }
+    .notification { position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Worker Dashboard</h2>
+    <div>
+      <a href="#" id="viewRequests" style="color: white;">My Requests</a>
+      <a href="#" id="logout" style="color: white; margin-left: 15px;">Logout</a>
+    </div>
+  </div>
+
+  <div class="container" id="requestFormContainer">
+    <h3>New Purchase Request</h3>
+    <input type="text" id="workerName" placeholder="Your Name">
+    <input type="text" id="projectName" placeholder="Project Name">
+    
+    <table id="itemsTable">
+      <thead>
+        <tr>
+          <th>Quantity</th>
+          <th>Units</th>
+          <th>Item Name</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="number" step="0.001" class="quantity"></td>
+          <td><input type="text" class="units"></td>
+          <td><input type="text" class="itemName"></td>
+          <td><button class="remove-row">Remove</button></td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <button id="addRow">Add Item</button>
+    <button id="submitRequest">Submit Request</button>
+  </div>
+
+  <div class="container" id="requestsContainer" style="display: none;">
+    <h3>My Requests</h3>
+    <table id="requestsTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Project</th>
+          <th>Items</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button id="backToForm">New Request</button>
+  </div>
+
+  <div class="notification" id="notification"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add row functionality
+      document.getElementById('addRow').addEventListener('click', function() {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+          <td><input type="number" step="0.001" class="quantity"></td>
+          <td><input type="text" class="units"></td>
+          <td><input type="text" class="itemName"></td>
+          <td><button class="remove-row">Remove</button></td>
+        `;
+        document.querySelector('#itemsTable tbody').appendChild(newRow);
+      });
+
+      // Submit request
+      document.getElementById('submitRequest').addEventListener('click', function() {
+        const workerName = document.getElementById('workerName').value;
+        const projectName = document.getElementById('projectName').value;
+        const items = [];
+        
+        document.querySelectorAll('#itemsTable tbody tr').forEach(row => {
+          items.push({
+            quantity: parseFloat(row.querySelector('.quantity').value),
+            units: row.querySelector('.units').value,
+            name: row.querySelector('.itemName').value
+          });
+        });
+
+        google.script.run
+          .withSuccessHandler(function() {
+            showNotification('Request submitted!');
+            document.getElementById('workerName').value = '';
+            document.getElementById('projectName').value = '';
+            document.querySelector('#itemsTable tbody').innerHTML = `
+              <tr>
+                <td><input type="number" step="0.001" class="quantity"></td>
+                <td><input type="text" class="units"></td>
+                <td><input type="text" class="itemName"></td>
+                <td><button class="remove-row">Remove</button></td>
+              </tr>
+            `;
+          })
+          .withFailureHandler(function(error) {
+            showNotification('Error: ' + error.message);
+          })
+          .submitPurchaseRequest({
+            workerName: workerName,
+            projectName: projectName,
+            items: items
+          });
+      });
+
+      // View requests
+      document.getElementById('viewRequests').addEventListener('click', function(e) {
+        e.preventDefault();
+        document.getElementById('requestFormContainer').style.display = 'none';
+        document.getElementById('requestsContainer').style.display = 'block';
+        
+        google.script.run
+          .withSuccessHandler(function(requests) {
+            const tbody = document.querySelector('#requestsTable tbody');
+            tbody.innerHTML = '';
+            
+            requests.forEach(request => {
+              const itemsText = request.items.map(item => 
+                `${item.quantity} ${item.units} of ${item.name}`
+              ).join('<br>');
+              
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${new Date(request.date).toLocaleString()}</td>
+                <td>${request.projectName}</td>
+                <td>${itemsText}</td>
+                <td>${request.status === 'Approved' ? 
+                  '<span style="color:green">Approved</span>' : 
+                  request.status === 'Rejected' ? 
+                  '<span style="color:red">Rejected</span>' : 
+                  'Pending'}</td>
+                <td>${request.status === 'Rejected' ? 
+                  `<button onclick="showReason('${request.rejectionReason}')">View Reason</button>` : ''}
+                </td>
+              `;
+              tbody.appendChild(row);
+            });
+          })
+          .getWorkerRequests();
+      });
+
+      // Back to form
+      document.getElementById('backToForm').addEventListener('click', function() {
+        document.getElementById('requestFormContainer').style.display = 'block';
+        document.getElementById('requestsContainer').style.display = 'none';
+      });
+
+      // Logout
+      document.getElementById('logout').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'login.html';
+      });
+    });
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => notification.style.display = 'none', 3000);
+    }
+
+    function showReason(reason) {
+      alert('Rejection Reason:\n\n' + reason);
+    }
+  </script>
+</body>
+</html>
