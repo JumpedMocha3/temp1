@@ -18,23 +18,6 @@ import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-async function login() {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    if (user.email === "admin@gmail.com") {
-      window.location.href = "admin.html";
-    } else {
-      window.location.href = "worker.html";
-    }
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
 async function signup() {
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
@@ -43,18 +26,21 @@ async function signup() {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // 👇 Add this: Save user info to Firestore
+    console.log('User created:', user.uid);
+
     await setDoc(doc(db, "users", user.uid), {
       email: user.email,
-      role: (user.email === "admin@gmail.com") ? "admin" : "worker",
+      role: user.email === "admin@gmail.com" ? "admin" : "worker",
       createdAt: new Date()
     });
 
-    alert('Sign up successful! Please login.');
+    alert('Sign up successful! Now please login.');
   } catch (error) {
+    console.error(error);
     alert(error.message);
   }
 }
 </script>
+
 </body>
 </html>
