@@ -2,69 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard</title>
 </head>
 <body>
-  <h1>Admin Panel</h1>
+  <h1>Admin Dashboard</h1>
+  <p>Welcome, Admin!</p>
 
-  <div id="requests"></div>
+  <button onclick="viewRequests()">View Requests</button>
 
-  <script type="module">
-    import { db } from './firebase-config.js';
-    import { collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-    function approveRequest(id, request) {
-      const htmlContent = `
-        <html>
-        <body>
-          <h2>Purchase Request</h2>
-          <p>Worker: ${request.workerName}</p>
-          <p>Project: ${request.projectName}</p>
-          <table border="1">
-            <tr><th>Quantity</th><th>Units</th><th>Item Name</th></tr>
-            ${request.items.map(item => `<tr><td>${item.quantity}</td><td>${item.units}</td><td>${item.itemName}</td></tr>`).join('')}
-          </table>
-        </body>
-        </html>
-      `;
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `PurchaseRequest-${request.workerName}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      updateDoc(doc(db, "requests", id), { status: "approved" });
+  <script>
+    function viewRequests() {
+      // Functionality to show purchase requests will go here.
+      alert("Display Purchase Requests here");
     }
-
-    function declineRequest(id) {
-      const reason = prompt('Enter decline reason:');
-      if (!reason) return;
-      updateDoc(doc(db, "requests", id), { status: "declined", reason });
-    }
-
-    onSnapshot(collection(db, "requests"), (snapshot) => {
-      const container = document.getElementById('requests');
-      container.innerHTML = '';
-      snapshot.forEach(docSnap => {
-        const request = docSnap.data();
-        if (request.status === "pending") {
-          const div = document.createElement('div');
-          div.innerHTML = `
-            <p>Worker: ${request.workerName}</p>
-            <p>Project: ${request.projectName}</p>
-            <button onclick="approveRequest('${docSnap.id}', ${JSON.stringify(request).replace(/"/g, '&quot;')})">Approve</button>
-            <button onclick="declineRequest('${docSnap.id}')">Decline</button>
-            <hr>
-          `;
-          container.appendChild(div);
-        }
-      });
-    });
-
-    window.approveRequest = approveRequest;
-    window.declineRequest = declineRequest;
   </script>
 </body>
 </html>
