@@ -1,11 +1,13 @@
-// Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyA5h26hiZRX2WA3tRCjUY2NlA6rnRV0E24",
+  authDomain: "namozag-3b281.firebaseapp.com",
+  databaseURL: "https://namozag-3b281-default-rtdb.firebaseio.com",
+  projectId: "namozag-3b281",
+  storageBucket: "namozag-3b281.firebasestorage.app",
+  messagingSenderId: "183249580094",
+  appId: "1:183249580094:web:af1070013478332698616f",
+  measurementId: "G-CE1RNHKMQG"
 };
 
 // Initialize Firebase
