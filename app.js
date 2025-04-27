@@ -1,13 +1,11 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyA5h26hiZRX2WA3tRCjUY2NlA6rnRV0E24",
-  authDomain: "namozag-3b281.firebaseapp.com",
-  databaseURL: "https://namozag-3b281-default-rtdb.firebaseio.com",
-  projectId: "namozag-3b281",
-  storageBucket: "namozag-3b281.firebasestorage.app",
-  messagingSenderId: "183249580094",
-  appId: "1:183249580094:web:af1070013478332698616f",
-  measurementId: "G-CE1RNHKMQG"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
 // Initialize Firebase
@@ -53,7 +51,6 @@ const requestDetailsContent = document.getElementById('request-details-content')
 // Modal buttons
 const modalApproveBtn = document.getElementById('modal-approve-btn');
 const modalDeclineBtn = document.getElementById('modal-decline-btn');
-const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const submitDeclineBtn = document.getElementById('submit-decline');
 const declineReasonText = document.getElementById('decline-reason-text');
 
@@ -82,7 +79,6 @@ function initApp() {
     addItemBtn.addEventListener('click', addItemRow);
     modalApproveBtn.addEventListener('click', approveRequest);
     modalDeclineBtn.addEventListener('click', showDeclineReasonModal);
-    modalCancelBtn.addEventListener('click', cancelRequest);
     submitDeclineBtn.addEventListener('click', submitDecline);
 
     // Add first item row
@@ -314,21 +310,12 @@ function loadMyRequests() {
                     <td class="status-${request.status}">${request.status}</td>
                     <td>
                         <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">View</button>
-                        ${request.status === 'pending' ? 
-                            `<button class="btn btn-sm btn-warning cancel-request" data-id="${doc.id}">Cancel</button>` : ''}
                     </td>
                 `;
                 myRequestsTable.appendChild(row);
                 
-                // Add event listeners
+                // Add event listener
                 row.querySelector('.view-details').addEventListener('click', () => viewRequestDetails(doc.id));
-                const cancelBtn = row.querySelector('.cancel-request');
-                if (cancelBtn) {
-                    cancelBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        cancelRequest(doc.id);
-                    });
-                }
             });
         })
         .catch(error => {
@@ -397,15 +384,8 @@ function viewRequestDetails(requestId) {
             const request = doc.data();
             currentRequestId = requestId;
             
-            // Show/hide buttons based on user role and request status
+            // Show/hide admin actions
             document.getElementById('admin-actions').style.display = isAdmin ? 'block' : 'none';
-            
-            const cancelBtn = document.getElementById('modal-cancel-btn');
-            if (!isAdmin && request.workerEmail === currentUser.email && request.status === 'pending') {
-                cancelBtn.style.display = 'block';
-            } else {
-                cancelBtn.style.display = 'none';
-            }
             
             // Build details HTML
             let itemsHtml = '<table class="table table-sm"><thead><tr><th>Qty</th><th>Units</th><th>Item</th></tr></thead><tbody>';
@@ -416,6 +396,7 @@ function viewRequestDetails(requestId) {
             
             let detailsHtml = `
                 <h5>Request from ${request.workerName}</h5>
+                <p><strong>Request ID:</strong> ${doc.id}</p>
                 <p><strong>Project:</strong> ${request.projectName}</p>
                 <p><strong>Submitted:</strong> ${request.createdAt.toDate().toLocaleString()}</p>
                 <p><strong>Status:</strong> <span class="status-${request.status}">${request.status}</span></p>
@@ -431,13 +412,6 @@ function viewRequestDetails(requestId) {
                         <p>${request.declineReason}</p>
                     </div>
                 `;
-            } else if (request.status === 'canceled' && request.cancelReason) {
-                detailsHtml += `
-                    <div class="alert alert-warning mt-3">
-                        <h6>Cancel Reason</h6>
-                        <p>${request.cancelReason}</p>
-                    </div>
-                `;
             }
             
             requestDetailsContent.innerHTML = detailsHtml;
@@ -447,45 +421,60 @@ function viewRequestDetails(requestId) {
 }
 
 function approveRequest() {
-    // Generate Excel file
     db.collection('purchaseRequests').doc(currentRequestId).get()
         .then(doc => {
             if (!doc.exists) throw new Error('Request not found');
             
             const request = doc.data();
-            const excelData = [
-                ['Purchase Order'],
-                ['Requester:', request.workerName],
-                ['Project:', request.projectName],
-                ['Date:', new Date().toLocaleDateString()],
-                [],
-                ['Quantity', 'Units', 'Item Name']
-            ];
+            const requestId = doc.id;
+            const timestamp = request.createdAt.toDate();
             
-            request.items.forEach(item => {
-                excelData.push([item.quantity, item.units, item.name]);
+            // Create PDF
+            const { jsPDF } = window.jspdf;
+            const docPDF = new jsPDF();
+            
+            // Add header
+            docPDF.setFontSize(18);
+            docPDF.text('PURCHASE ORDER', 105, 20, { align: 'center' });
+            
+            // Request info
+            docPDF.setFontSize(10);
+            docPDF.text(`Request ID: ${requestId}`, 14, 30);
+            docPDF.text(`Date: ${timestamp.toLocaleDateString()}`, 14, 36);
+            docPDF.text(`Time: ${timestamp.toLocaleTimeString()}`, 14, 42);
+            
+            // Requester info
+            docPDF.text(`Requester: ${request.workerName}`, 105, 30);
+            docPDF.text(`Email: ${request.workerEmail}`, 105, 36);
+            docPDF.text(`Project: ${request.projectName}`, 105, 42);
+            
+            // Items table
+            docPDF.autoTable({
+                startY: 50,
+                head: [['Item', 'Quantity', 'Units']],
+                body: request.items.map(item => [item.name, item.quantity, item.units]),
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [22, 160, 133] }
             });
             
-            // Create worksheet and workbook
-            const ws = XLSX.utils.aoa_to_sheet(excelData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Purchase Order");
-            
-            // Generate file
-            XLSX.writeFile(wb, `Purchase_Order_${currentRequestId}.xlsx`);
+            // Save PDF
+            const pdfName = `Purchase_Order_${requestId}.pdf`;
+            docPDF.save(pdfName);
             
             // Update request status
             return db.collection('purchaseRequests').doc(currentRequestId).update({
                 status: 'approved',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                approvedPdfUrl: pdfName
             });
         })
         .then(() => {
-            // Notify worker
+            // Notify worker and send to bajiyof761@cyluna.com
             db.collection('purchaseRequests').doc(currentRequestId).get()
                 .then(doc => {
                     const request = doc.data();
                     
+                    // Notification to worker
                     db.collection('notifications').add({
                         userId: currentUser.uid,
                         message: `Your request for ${request.projectName} has been approved`,
@@ -494,14 +483,26 @@ function approveRequest() {
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     
-                    // Open email client
-                    const subject = encodeURIComponent(`Purchase Order Approved - ${request.projectName}`);
-                    const body = encodeURIComponent(`Dear ${request.workerName},\n\nYour purchase request for project "${request.projectName}" has been approved.\n\nPlease find the attached purchase order.\n\nRegards,\nPurchase Team`);
-                    window.open(`mailto:${request.workerEmail}?subject=${subject}&body=${body}`);
+                    // Email to bajiyof761@cyluna.com
+                    const subject = encodeURIComponent(`New Purchase Order #${doc.id}`);
+                    const body = encodeURIComponent(
+                        `New purchase order approved:\n\n` +
+                        `Request ID: ${doc.id}\n` +
+                        `Requester: ${request.workerName}\n` +
+                        `Project: ${request.projectName}\n` +
+                        `Date: ${new Date().toLocaleString()}\n\n` +
+                        `Items:\n\n` +
+                        request.items.map(item => 
+                            `${item.quantity} ${item.units} of ${item.name}`
+                        ).join('\n') +
+                        `\n\nPlease prepare these items for delivery.`
+                    );
+                    
+                    window.open(`mailto:bajiyof761@cyluna.com?subject=${subject}&body=${body}`);
                 });
             
             requestDetailsModal.hide();
-            showNotification('Success', 'Request approved and Excel file downloaded');
+            showNotification('Success', 'Request approved and PDF generated');
             loadAllRequests();
         })
         .catch(error => showNotification('Error', 'Failed to approve request: ' + error.message));
@@ -538,11 +539,6 @@ function submitDecline() {
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
-                // Open email client
-                const subject = encodeURIComponent(`Purchase Order Declined - ${request.projectName}`);
-                const body = encodeURIComponent(`Dear ${request.workerName},\n\nYour purchase request for project "${request.projectName}" has been declined.\n\nReason: ${reason}\n\nRegards,\nPurchase Team`);
-                window.open(`mailto:${request.workerEmail}?subject=${subject}&body=${body}`);
             });
         
         declineReasonModal.hide();
@@ -551,22 +547,6 @@ function submitDecline() {
         loadAllRequests();
     })
     .catch(error => showNotification('Error', 'Failed to decline request: ' + error.message));
-}
-
-function cancelRequest() {
-    if (!confirm('Are you sure you want to cancel this request?')) return;
-    
-    db.collection('purchaseRequests').doc(currentRequestId).update({
-        status: 'canceled',
-        cancelReason: 'Canceled by requester',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    })
-    .then(() => {
-        requestDetailsModal.hide();
-        showNotification('Success', 'Request canceled successfully');
-        loadMyRequests();
-    })
-    .catch(error => showNotification('Error', 'Failed to cancel request: ' + error.message));
 }
 
 // Notification functions
