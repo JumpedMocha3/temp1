@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <style>
+    body { font-family: Arial; margin: 0; }
+    .header { background: #4285f4; color: white; padding: 10px 20px; display: flex; justify-content: space-between; }
+    .container { padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    button { background: #4285f4; color: white; border: none; padding: 8px; margin: 2px; }
+    .approve { background: #4CAF50; }
+    .reject { background: #f44336; }
+    .notification { position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px; display: none; }
+    #rejectionModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 20px; width: 400px; }
+    textarea { width: 100%; height: 100px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Admin Dashboard</h2>
+    <div>
+      <a href="#" id="logout" style="color: white;">Logout</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h3>Pending Requests</h3>
+    <table id="requestsTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Worker</th>
+          <th>Project</th>
+          <th>Items</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="notification" id="notification"></div>
+
+  <div id="rejectionModal">
+    <div class="modal-content">
+      <h3>Rejection Reason</h3>
+      <textarea id="rejectionReason" placeholder="Enter reason..."></textarea>
+      <button id="submitRejection">Submit</button>
+      <button id="cancelRejection">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    let currentRequestId = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadRequests();
+
+      document.getElementById('logout').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'login.html';
+      });
+
+      document.getElementById('submitRejection').addEventListener('click', function() {
+        const reason = document.getElementById('rejectionReason').value;
+        if (!reason) return alert('Please enter a reason');
+        
+        google.script.run
+          .withSuccessHandler(function() {
+            document.getElementById('rejectionModal').style.display = 'none';
+            showNotification('Request rejected');
+            loadRequests();
+          })
+          .rejectRequest(currentRequestId, reason);
+      });
+
+      document.getElementById('cancelRejection').addEventListener('click', function() {
+        document.getElementById('rejectionModal').style.display = 'none';
+      });
+    });
+
+    function loadRequests() {
+      google.script.run
+        .withSuccessHandler(function(requests) {
+          const tbody = document.querySelector('#requestsTable tbody');
+          tbody.innerHTML = '';
+          
+          requests.forEach(request => {
+            const itemsText = request.items.map(item => 
+              `${item.quantity} ${item.units} of ${item.name}`
+            ).join('<br>');
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${new Date(request.date).toLocaleString()}</td>
+              <td>${request.workerName}</td>
+              <td>${request.projectName}</td>
+              <td>${itemsText}</td>
+              <td>
+                <button class="approve" onclick="approveRequest('${request.id}')">Approve</button>
+                <button class="reject" onclick="showRejectionModal('${request.id}')">Reject</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        })
+        .getPendingRequests();
+    }
+
+    function approveRequest(requestId) {
+      if (confirm('Approve this request?')) {
+        google.script.run
+          .withSuccessHandler(function(url) {
+            showNotification('Request approved');
+            window.open(url, '_blank');
+            loadRequests();
+          })
+          .approveRequest(requestId);
+      }
+    }
+
+    function showRejectionModal(requestId) {
+      currentRequestId = requestId;
+      document.getElementById('rejectionModal').style.display = 'flex';
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => notification.style.display = 'none', 3000);
+    }
+  </script>
+</body>
+</html>
