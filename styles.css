@@ -25,7 +25,7 @@ body {
     font-weight: bold;
 }
 
-.status-declined, .status-canceled {
+.status-declined {
     color: #dc3545;
     font-weight: bold;
 }
