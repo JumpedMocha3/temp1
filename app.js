@@ -196,7 +196,7 @@ function addItemRow() {
             <input type="text" class="form-control quantity" placeholder="الكمية" required>
         </div>
         <div class="col-md-3">
-            <input type="text" class="form-control units" value="قطعة" placeholder="الوحدة" required>
+            <input type="text" class="form-control units" placeholder="الوحدة" required>
         </div>
         <div class="col-md-5">
             <input type="text" class="form-control item-name" placeholder="اسم الصنف" required>
