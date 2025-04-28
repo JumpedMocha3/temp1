@@ -37,17 +37,17 @@
     <div id="app-container" class="container-fluid" style="display: none;">
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <a class="navbar-brand" href="#">Purchase System</a>
+                <a class="navbar-brand" href="#">نظام الشراء</a>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link active" href="#" id="new-request-link">New Request</a>
+                            <a class="nav-link active" href="#" id="new-request-link">طلب جديد</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#" id="my-requests-link">My Requests</a>
+                            <a class="nav-link" href="#" id="my-requests-link">طلباتي</a>
                         </li>
                         <li class="nav-item" id="admin-requests-item" style="display: none;">
-                            <a class="nav-link" href="#" id="all-requests-link">All Requests</a>
+                            <a class="nav-link" href="#" id="all-requests-link">جميع الطلبات</a>
                         </li>
                     </ul>
                     <span class="navbar-text">
@@ -60,10 +60,10 @@
 
         <div class="container mt-4">
             <div id="new-request-section">
-                <h2>New Purchase Request</h2>
+                <h2>طلب شراء جديد</h2>
                 <form id="purchase-request-form">
                     <div class="mb-3">
-                        <label for="worker-name" class="form-label">Your Name</label>
+                        <label for="worker-name" class="form-label">اسمك</label>
                         <input type="text" class="form-control" id="worker-name" required>
                     </div>
                     <div class="mb-3">
@@ -72,20 +72,20 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="project-name" class="form-label">Project Name</label>
+                        <label for="project-name" class="form-label">اسم المشروع</label>
                         <input type="text" class="form-control" id="project-name" required>
                     </div>
                     
                     <h5>Requested Items</h5>
                     <div id="items-container"></div>
                     
-                    <button type="button" class="btn btn-secondary mb-3" id="add-item">Add Item</button>
-                    <button type="submit" class="btn btn-primary w-100">Submit Request</button>
+                    <button type="button" class="btn btn-secondary mb-3" id="add-item">إضافة عنصر</button>
+                    <button type="submit" class="btn btn-primary w-100">إرسال الطلب</button>
                 </form>
             </div>
 
             <div id="my-requests-section" style="display: none;">
-                <h2>My Purchase Requests</h2>
+                <h2>طلبات الشراء الخاصة بي</h2>
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
@@ -103,7 +103,7 @@
             </div>
 
             <div id="all-requests-section" style="display: none;">
-                <h2>All Purchase Requests</h2>
+                <h2>كافة طلبات الشراء</h2>
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
@@ -128,15 +128,15 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Request Details</h5>
+                    <h5 class="modal-title">تفاصيل الطلب</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="request-details-content"></div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <div id="admin-actions" style="display: none;">
-                        <button type="button" class="btn btn-success" id="modal-approve-btn">Approve</button>
-                        <button type="button" class="btn btn-danger" id="modal-decline-btn">Decline</button>
+                        <button type="button" class="btn btn-success" id="modal-approve-btn">يعتمد</button>
+                        <button type="button" class="btn btn-danger" id="modal-decline-btn">يرفض</button>
                     </div>
                 </div>
             </div>
@@ -148,18 +148,18 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Decline Request</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">رفض الطلب</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="اغلق"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="decline-reason-text" class="form-label">Reason for Decline</label>
+                        <label for="decline-reason-text" class="form-label">سبب الرفض</label>
                         <textarea class="form-control" id="decline-reason-text" rows="3" required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="submit-decline">Submit</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">اغلق</button>
+                    <button type="button" class="btn btn-primary" id="submit-decline">ارسال</button>
                 </div>
             </div>
         </div>
@@ -182,7 +182,7 @@
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <script src="app.js"></script>
- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
