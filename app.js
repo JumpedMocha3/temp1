@@ -435,7 +435,7 @@ function viewRequestDetails(requestId) {
 // Arabic PDF Generation with proper RTL support
 async function generateArabicPDF(request, requestId) {
     try {
-        // Load jsPDF and plugins
+        // Load jsPDF
         const { jsPDF } = window.jspdf;
         
         // Create new PDF document
@@ -445,7 +445,10 @@ async function generateArabicPDF(request, requestId) {
             format: 'a4'
         });
 
-        // Set document properties
+        // Enable RTL
+        doc.setR2L(true);
+
+        // Add metadata
         doc.setProperties({
             title: `طلب شراء ${requestId}`,
             subject: 'طلب شراء',
@@ -453,13 +456,6 @@ async function generateArabicPDF(request, requestId) {
             keywords: 'طلب, شراء, مواد',
             creator: 'نظام إدارة طلبات الشراء'
         });
-
-        // Add Arabic font (using default font that supports Arabic)
-        // Note: For full Arabic support, you would need to add a custom font
-        // but we'll use the basic approach that works with jsPDF's built-in support
-
-        // Enable RTL
-        doc.setR2L(true);
 
         // Header
         doc.setFontSize(18);
@@ -487,10 +483,12 @@ async function generateArabicPDF(request, requestId) {
         // Notes if available
         if (request.notes) {
             y += 10;
-            // Split notes into multiple lines if too long
+            // Split Arabic text properly
             const splitNotes = doc.splitTextToSize(request.notes, 150);
-            doc.text(`ملاحظات: ${splitNotes}`, rightX, y, { align: 'right', maxWidth: 150 });
-            y += splitNotes.length * 6; // Adjust y position based on number of lines
+            doc.text('ملاحظات:', rightX, y, { align: 'right' });
+            y += 6;
+            doc.text(splitNotes, rightX, y, { align: 'right', maxWidth: 150 });
+            y += splitNotes.length * 6;
         }
 
         // Items table
@@ -499,7 +497,7 @@ async function generateArabicPDF(request, requestId) {
         // Prepare table data
         const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
 
-        // Generate table with right-to-left support
+        // Generate table with proper Arabic support
         doc.autoTable({
             startY: startY,
             head: [['الصنف', 'الكمية', 'الوحدة']],
@@ -522,7 +520,7 @@ async function generateArabicPDF(request, requestId) {
             },
             margin: { right: 10, left: 10 },
             didDrawPage: function (data) {
-                // Footer
+                // Arabic page number
                 doc.setFontSize(10);
                 const pageCount = doc.internal.getNumberOfPages();
                 doc.text(`صفحة ${data.pageNumber} من ${pageCount}`, 105, 285, { align: 'center' });
