@@ -82,7 +82,9 @@ function initApp() {
     modalApproveBtn.addEventListener('click', approveRequest);
     modalDeclineBtn.addEventListener('click', showDeclineReasonModal);
     submitDeclineBtn.addEventListener('click', submitDecline);
-
+    // Set RTL for Arabic
+    document.body.setAttribute('dir', 'rtl');
+    document.body.classList.add('arabic-text');
     // Add first item row
     addItemRow();
 
