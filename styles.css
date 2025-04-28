@@ -51,25 +51,62 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
 }
-/* Add RTL support */
-body[dir="rtl"] {
+/* Arabic font and RTL support */
+body {
+    font-family: 'Tajawal', sans-serif;
     text-align: right;
-}
-
-body[dir="rtl"] .item-row .form-control {
-    text-align: right;
-}
-
-body[dir="rtl"] .table {
     direction: rtl;
 }
 
-body[dir="rtl"] .table th {
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .navbar-brand {
+        font-size: 1rem;
+    }
+    
+    .card {
+        margin: 10px 0;
+    }
+    
+    .item-row .col-md-3, 
+    .item-row .col-md-5 {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    
+    .btn {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    #items-container .item-row {
+        margin-bottom: 8px;
+        padding: 8px;
+    }
+}
+
+/* Form inputs */
+.form-control {
+    font-size: 16px; /* Prevent mobile zoom */
     text-align: right;
 }
 
-/* Add this to your existing CSS */
-.arabic-text {
+/* Tables */
+.table {
+    width: 100%;
+}
+
+.table th {
+    text-align: right;
+}
+
+/* PDF specific (not shown to users) */
+.pdf-arabic {
     font-family: 'Tajawal', sans-serif;
     direction: rtl;
 }
