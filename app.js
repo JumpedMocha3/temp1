@@ -1,13 +1,11 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyA5h26hiZRX2WA3tRCjUY2NlA6rnRV0E24",
-  authDomain: "namozag-3b281.firebaseapp.com",
-  databaseURL: "https://namozag-3b281-default-rtdb.firebaseio.com",
-  projectId: "namozag-3b281",
-  storageBucket: "namozag-3b281.firebasestorage.app",
-  messagingSenderId: "183249580094",
-  appId: "1:183249580094:web:af1070013478332698616f",
-  measurementId: "G-CE1RNHKMQG"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
 // Initialize Firebase
@@ -15,15 +13,15 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// Google Auth Provider
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
-const authForm = document.getElementById('auth-form');
-const loginBtn = document.getElementById('login-btn');
-const registerBtn = document.getElementById('register-btn');
+const googleSignInBtn = document.getElementById('google-signin');
 const logoutBtn = document.getElementById('logout-btn');
 const userEmailSpan = document.getElementById('user-email');
-const isAdminCheckbox = document.getElementById('isAdmin');
 
 // Navigation
 const newRequestLink = document.getElementById('new-request-link');
@@ -40,6 +38,7 @@ const allRequestsSection = document.getElementById('all-requests-section');
 const purchaseRequestForm = document.getElementById('purchase-request-form');
 const itemsContainer = document.getElementById('items-container');
 const addItemBtn = document.getElementById('add-item');
+const requestNotes = document.getElementById('request-notes');
 
 // Tables
 const myRequestsTable = document.getElementById('my-requests-table');
@@ -70,9 +69,12 @@ let currentRequestId = null;
 document.addEventListener('DOMContentLoaded', initApp);
 
 function initApp() {
+    // Set RTL and Arabic font
+    document.body.setAttribute('dir', 'rtl');
+    document.body.style.fontFamily = "'Tajawal', sans-serif";
+    
     // Event listeners
-    authForm.addEventListener('submit', handleAuth);
-    registerBtn.addEventListener('click', handleRegister);
+    googleSignInBtn.addEventListener('click', signInWithGoogle);
     logoutBtn.addEventListener('click', handleLogout);
     newRequestLink.addEventListener('click', showNewRequestSection);
     myRequestsLink.addEventListener('click', showMyRequestsSection);
@@ -82,11 +84,12 @@ function initApp() {
     modalApproveBtn.addEventListener('click', approveRequest);
     modalDeclineBtn.addEventListener('click', showDeclineReasonModal);
     submitDeclineBtn.addEventListener('click', submitDecline);
-    // Set RTL for Arabic
-    document.body.setAttribute('dir', 'rtl');
-    document.body.classList.add('arabic-text');
+
     // Add first item row
     addItemRow();
+
+    // Setup mobile UI
+    setupMobileUI();
 
     // Auth state listener
     auth.onAuthStateChanged(user => {
@@ -120,43 +123,37 @@ function initApp() {
     });
 }
 
-// Authentication functions
-function handleAuth(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    auth.signInWithEmailAndPassword(email, password)
-        .then(() => showNotification('Success', 'Logged in successfully'))
-        .catch(error => showNotification('Error', error.message));
-}
-
-function handleRegister() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const isAdmin = document.getElementById('isAdmin').checked;
-    
-    if (!email || !password) {
-        showNotification('Error', 'Please enter email and password');
-        return;
-    }
-    
-    auth.createUserWithEmailAndPassword(email, password)
-        .then(userCredential => {
-            return db.collection('users').doc(userCredential.user.uid).set({
-                email: email,
-                isAdmin: isAdmin,
+// Google Sign-In
+async function signInWithGoogle() {
+    try {
+        const result = await auth.signInWithPopup(googleProvider);
+        const user = result.user;
+        
+        // Check if user exists in Firestore
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            // Create new user document
+            await db.collection('users').doc(user.uid).set({
+                name: user.displayName,
+                email: user.email,
+                isAdmin: false, // Default to worker role
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        })
-        .then(() => showNotification('Success', 'Account created successfully'))
-        .catch(error => showNotification('Error', error.message));
+        }
+        
+        showNotification('نجاح', 'تم تسجيل الدخول بنجاح');
+    } catch (error) {
+        console.error('Error signing in with Google:', error);
+        showNotification('خطأ', 'فشل في تسجيل الدخول: ' + error.message);
+    }
 }
 
+// Logout
 function handleLogout() {
     auth.signOut()
-        .then(() => showNotification('Success', 'Logged out successfully'))
-        .catch(error => showNotification('Error', error.message));
+        .then(() => showNotification('نجاح', 'تم تسجيل الخروج بنجاح'))
+        .catch(error => showNotification('خطأ', error.message));
 }
 
 // Navigation functions
@@ -194,13 +191,13 @@ function addItemRow() {
     row.className = 'item-row row';
     row.innerHTML = `
         <div class="col-md-3">
-            <input type="number" class="form-control quantity" step="0.001" value="1" placeholder="Quantity" required>
+            <input type="text" class="form-control quantity" placeholder="الكمية" required>
         </div>
         <div class="col-md-3">
-            <input type="text" class="form-control units" value="pcs" placeholder="Units" required>
+            <input type="text" class="form-control units" value="قطعة" placeholder="الوحدة" required>
         </div>
         <div class="col-md-5">
-            <input type="text" class="form-control item-name" placeholder="Item name" required>
+            <input type="text" class="form-control item-name" placeholder="اسم الصنف" required>
         </div>
         <div class="col-md-1 d-flex align-items-center">
             <button type="button" class="btn btn-danger btn-sm remove-item">X</button>
@@ -214,7 +211,7 @@ function addItemRow() {
         if (itemsContainer.children.length > 1) {
             row.remove();
         } else {
-            showNotification('Info', 'You need at least one item');
+            showNotification('تنبيه', 'يجب إضافة صنف واحد على الأقل');
         }
     });
 }
@@ -224,10 +221,11 @@ function submitPurchaseRequest(e) {
     
     const workerName = document.getElementById('worker-name').value.trim();
     const projectName = document.getElementById('project-name').value.trim();
+    const notes = requestNotes.value.trim();
     
     // Validate inputs
     if (!workerName || !projectName) {
-        showNotification('Error', 'Please fill in all fields');
+        showNotification('خطأ', 'الرجاء ملء جميع الحقول المطلوبة');
         return;
     }
     
@@ -236,12 +234,12 @@ function submitPurchaseRequest(e) {
     const itemRows = itemsContainer.querySelectorAll('.item-row');
     
     itemRows.forEach(row => {
-        const quantity = parseFloat(row.querySelector('.quantity').value);
+        const quantity = row.querySelector('.quantity').value.trim();
         const units = row.querySelector('.units').value.trim();
         const name = row.querySelector('.item-name').value.trim();
         
-        if (!name || isNaN(quantity)) {
-            showNotification('Error', 'Please fill in all item fields correctly');
+        if (!name || !quantity) {
+            showNotification('خطأ', 'الرجاء ملء جميع حقول الأصناف');
             throw new Error('Invalid item data');
         }
         
@@ -254,6 +252,7 @@ function submitPurchaseRequest(e) {
         workerEmail: currentUser.email,
         projectName,
         items,
+        notes,
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -262,7 +261,7 @@ function submitPurchaseRequest(e) {
     // Save to Firestore
     db.collection('purchaseRequests').add(request)
         .then(() => {
-            showNotification('Success', 'Request submitted successfully');
+            showNotification('نجاح', 'تم إرسال الطلب بنجاح');
             purchaseRequestForm.reset();
             itemsContainer.innerHTML = '';
             addItemRow();
@@ -271,7 +270,7 @@ function submitPurchaseRequest(e) {
             // Notify admins
             if (!isAdmin) notifyAdmins(workerName);
         })
-        .catch(error => showNotification('Error', 'Failed to submit request: ' + error.message));
+        .catch(error => showNotification('خطأ', 'فشل في إرسال الطلب: ' + error.message));
 }
 
 function notifyAdmins(workerName) {
@@ -280,7 +279,7 @@ function notifyAdmins(workerName) {
             snapshot.forEach(doc => {
                 db.collection('notifications').add({
                     userId: doc.id,
-                    message: `New request from ${workerName}`,
+                    message: `طلب جديد من ${workerName}`,
                     type: 'new_request',
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -291,7 +290,7 @@ function notifyAdmins(workerName) {
 
 // Request management functions
 function loadMyRequests() {
-    myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+    myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">جار التحميل...</td></tr>';
     
     db.collection('purchaseRequests')
         .where('workerEmail', '==', currentUser.email)
@@ -299,7 +298,7 @@ function loadMyRequests() {
         .get()
         .then(snapshot => {
             if (snapshot.empty) {
-                myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">No requests found</td></tr>';
+                myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">لا توجد طلبات</td></tr>';
                 return;
             }
             
@@ -308,12 +307,12 @@ function loadMyRequests() {
                 const request = doc.data();
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${request.createdAt.toDate().toLocaleString()}</td>
+                    <td>${request.createdAt.toDate().toLocaleString('ar-EG')}</td>
                     <td>${request.projectName}</td>
-                    <td>${request.items.length} items</td>
+                    <td>${request.items.length} أصناف</td>
                     <td class="status-${request.status}">${request.status}</td>
                     <td>
-                        <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">View</button>
+                        <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">عرض</button>
                     </td>
                 `;
                 myRequestsTable.appendChild(row);
@@ -323,20 +322,20 @@ function loadMyRequests() {
             });
         })
         .catch(error => {
-            showNotification('Error', 'Failed to load requests: ' + error.message);
-            myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading requests</td></tr>';
+            showNotification('خطأ', 'فشل في تحميل الطلبات: ' + error.message);
+            myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
         });
 }
 
 function loadAllRequests() {
-    allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+    allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">جار التحميل...</td></tr>';
     
     db.collection('purchaseRequests')
         .orderBy('createdAt', 'desc')
         .get()
         .then(snapshot => {
             if (snapshot.empty) {
-                allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">No requests found</td></tr>';
+                allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">لا توجد طلبات</td></tr>';
                 return;
             }
             
@@ -345,15 +344,15 @@ function loadAllRequests() {
                 const request = doc.data();
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${request.createdAt.toDate().toLocaleString()}</td>
+                    <td>${request.createdAt.toDate().toLocaleString('ar-EG')}</td>
                     <td>${request.workerName} (${request.workerEmail})</td>
                     <td>${request.projectName}</td>
-                    <td>${request.items.length} items</td>
+                    <td>${request.items.length} أصناف</td>
                     <td class="status-${request.status}">${request.status}</td>
                     <td>
-                        <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">View</button>
+                        <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">عرض</button>
                         ${request.status === 'pending' ? 
-                            `<button class="btn btn-sm btn-warning process-request" data-id="${doc.id}">Process</button>` : ''}
+                            `<button class="btn btn-sm btn-warning process-request" data-id="${doc.id}">معالجة</button>` : ''}
                     </td>
                 `;
                 allRequestsTable.appendChild(row);
@@ -372,8 +371,8 @@ function loadAllRequests() {
             });
         })
         .catch(error => {
-            showNotification('Error', 'Failed to load requests: ' + error.message);
-            allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading requests</td></tr>';
+            showNotification('خطأ', 'فشل في تحميل الطلبات: ' + error.message);
+            allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
         });
 }
 
@@ -381,7 +380,7 @@ function viewRequestDetails(requestId) {
     db.collection('purchaseRequests').doc(requestId).get()
         .then(doc => {
             if (!doc.exists) {
-                showNotification('Error', 'Request not found');
+                showNotification('خطأ', 'الطلب غير موجود');
                 return;
             }
             
@@ -392,27 +391,34 @@ function viewRequestDetails(requestId) {
             document.getElementById('admin-actions').style.display = isAdmin ? 'block' : 'none';
             
             // Build details HTML
-            let itemsHtml = '<table class="table table-sm"><thead><tr><th>Qty</th><th>Units</th><th>Item</th></tr></thead><tbody>';
+            let itemsHtml = '<table class="table table-sm"><thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th></tr></thead><tbody>';
             request.items.forEach(item => {
-                itemsHtml += `<tr><td>${item.quantity}</td><td>${item.units}</td><td>${item.name}</td></tr>`;
+                itemsHtml += `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${item.units}</td></tr>`;
             });
             itemsHtml += '</tbody></table>';
             
             let detailsHtml = `
-                <h5>Request from ${request.workerName}</h5>
-                <p><strong>Request ID:</strong> ${doc.id}</p>
-                <p><strong>Project:</strong> ${request.projectName}</p>
-                <p><strong>Submitted:</strong> ${request.createdAt.toDate().toLocaleString()}</p>
-                <p><strong>Status:</strong> <span class="status-${request.status}">${request.status}</span></p>
+                <h5>طلب من ${request.workerName}</h5>
+                <p><strong>رقم الطلب:</strong> ${doc.id}</p>
+                <p><strong>المشروع:</strong> ${request.projectName}</p>
+                <p><strong>تاريخ الإرسال:</strong> ${request.createdAt.toDate().toLocaleString('ar-EG')}</p>
+                <p><strong>الحالة:</strong> <span class="status-${request.status}">${request.status}</span></p>
                 
-                <h5 class="mt-4">Items</h5>
+                <h5 class="mt-4">الأصناف</h5>
                 ${itemsHtml}
             `;
+            
+            if (request.notes) {
+                detailsHtml += `
+                    <h5 class="mt-3">ملاحظات</h5>
+                    <p>${request.notes}</p>
+                `;
+            }
             
             if (request.status === 'declined' && request.declineReason) {
                 detailsHtml += `
                     <div class="alert alert-danger mt-3">
-                        <h6>Decline Reason</h6>
+                        <h6>سبب الرفض</h6>
                         <p>${request.declineReason}</p>
                     </div>
                 `;
@@ -421,95 +427,121 @@ function viewRequestDetails(requestId) {
             requestDetailsContent.innerHTML = detailsHtml;
             requestDetailsModal.show();
         })
-        .catch(error => showNotification('Error', 'Failed to load request: ' + error.message));
+        .catch(error => showNotification('خطأ', 'فشل في تحميل تفاصيل الطلب: ' + error.message));
 }
 
-function approveRequest() {
-    db.collection('purchaseRequests').doc(currentRequestId).get()
-        .then(doc => {
-            if (!doc.exists) throw new Error('Request not found');
-            
-            const request = doc.data();
-            const requestId = doc.id;
-            const timestamp = request.createdAt.toDate();
-            
-            // Create PDF
-            const { jsPDF } = window.jspdf;
-            const docPDF = new jsPDF();
-            
-            // Add header
-            docPDF.setFontSize(18);
-            docPDF.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-            
-            // Request info
-            docPDF.setFontSize(10);
-            docPDF.text(`Request ID: ${requestId}`, 14, 30);
-            docPDF.text(`Date: ${timestamp.toLocaleDateString()}`, 14, 36);
-            docPDF.text(`Time: ${timestamp.toLocaleTimeString()}`, 14, 42);
-            
-            // Requester info
-            docPDF.text(`Requester: ${request.workerName}`, 105, 30);
-            docPDF.text(`Email: ${request.workerEmail}`, 105, 36);
-            docPDF.text(`Project: ${request.projectName}`, 105, 42);
-            
-            // Items table
-            docPDF.autoTable({
-                startY: 50,
-                head: [['Item', 'Quantity', 'Units']],
-                body: request.items.map(item => [item.name, item.quantity, item.units]),
-                styles: { fontSize: 9 },
-                headStyles: { fillColor: [22, 160, 133] }
-            });
-            
-            // Save PDF
-            const pdfName = `Purchase_Order_${requestId}.pdf`;
-            docPDF.save(pdfName);
-            
-            // Update request status
-            return db.collection('purchaseRequests').doc(currentRequestId).update({
-                status: 'approved',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                approvedPdfUrl: pdfName
-            });
-        })
-        .then(() => {
-            // Notify worker and send to bajiyof761@cyluna.com
-            db.collection('purchaseRequests').doc(currentRequestId).get()
-                .then(doc => {
-                    const request = doc.data();
-                    
-                    // Notification to worker
-                    db.collection('notifications').add({
-                        userId: currentUser.uid,
-                        message: `Your request for ${request.projectName} has been approved`,
-                        type: 'request_update',
-                        read: false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    // Email to bajiyof761@cyluna.com
-                    const subject = encodeURIComponent(`New Purchase Order #${doc.id}`);
-                    const body = encodeURIComponent(
-                        `New purchase order approved:\n\n` +
-                        `Request ID: ${doc.id}\n` +
-                        `Requester: ${request.workerName}\n` +
-                        `Project: ${request.projectName}\n` +
-                        `Date: ${new Date().toLocaleString()}\n\n` +
-                        `Items:\n\n` +
-                        request.items.map(item => 
-                            `${item.quantity} ${item.units} of ${item.name}`
-                        ).join('\n') +
-                        `\n\nPlease prepare these items for delivery.`
-                    );
-                    
-                    window.open(`mailto:bajiyof761@cyluna.com?subject=${subject}&body=${body}`);
-                });
-            
-            requestDetailsModal.hide();
-            showNotification('Success', 'Request approved and PDF generated');
-            loadAllRequests();
-        })
-        .catch(error => showNotification('Error', 'Failed to approve request: ' + error.message));
+// Arabic PDF Generation
+async function generateArabicPDF(request, requestId) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    // Add Arabic font
+    doc.addFont('https://fonts.googleapis.com/css2?family=Tajawal&display=swap', 'Tajawal', 'normal');
+    doc.setFont('Tajawal');
+    
+    // Set RTL direction
+    doc.setR2L(true);
+
+    // Header
+    doc.setFontSize(18);
+    doc.text('أمر شراء', 105, 20, { align: 'center' });
+
+    // Request info
+    doc.setFontSize(10);
+    doc.text(`رقم الطلب: ${requestId}`, 180, 30, { align: 'right' });
+    doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, 180, 36, { align: 'right' });
+    doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, 180, 42, { align: 'right' });
+
+    // Requester info
+    doc.text(`مقدم الطلب: ${request.workerName}`, 100, 30, { align: 'right' });
+    doc.text(`البريد الإلكتروني: ${request.workerEmail}`, 100, 36, { align: 'right' });
+    doc.text(`المشروع: ${request.projectName}`, 100, 42, { align: 'right' });
+
+    // Notes if available
+    if (request.notes) {
+        doc.text(`ملاحظات: ${request.notes}`, 180, 50, { align: 'right' });
+    }
+
+    // Items table (RTL)
+    doc.autoTable({
+        startY: request.notes ? 60 : 50,
+        head: [['الصنف', 'الكمية', 'الوحدة']],
+        headStyles: {
+            fillColor: [22, 160, 133],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'right'
+        },
+        body: request.items.map(item => [item.name, item.quantity, item.units]),
+        styles: {
+            font: 'Tajawal',
+            fontStyle: 'normal',
+            halign: 'right'
+        },
+        columnStyles: {
+            0: { cellWidth: 'auto', halign: 'right' },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 30, halign: 'center' }
+        },
+        margin: { right: 10 }
+    });
+
+    // Approval section
+    doc.text('التوقيع:', 180, doc.lastAutoTable.finalY + 10, { align: 'right' });
+    doc.text('________________________', 180, doc.lastAutoTable.finalY + 20, { align: 'right' });
+    doc.text('ختم المؤسسة', 180, doc.lastAutoTable.finalY + 25, { align: 'right' });
+
+    return doc;
+}
+
+async function approveRequest() {
+    try {
+        const doc = await db.collection('purchaseRequests').doc(currentRequestId).get();
+        if (!doc.exists) throw new Error('الطلب غير موجود');
+        
+        const request = doc.data();
+        const requestId = doc.id;
+        
+        // Generate PDF
+        const pdfDoc = await generateArabicPDF(request, requestId);
+        const pdfName = `طلب_شراء_${requestId}.pdf`;
+        pdfDoc.save(pdfName);
+        
+        // Update request status
+        await db.collection('purchaseRequests').doc(currentRequestId).update({
+            status: 'approved',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            approvedPdfUrl: pdfName
+        });
+        
+        // Send email to bajiyof761@cyluna.com
+        const subject = encodeURIComponent(`طلب شراء جديد #${requestId}`);
+        const body = encodeURIComponent(
+            `تمت الموافقة على طلب شراء جديد:\n\n` +
+            `رقم الطلب: ${requestId}\n` +
+            `مقدم الطلب: ${request.workerName}\n` +
+            `المشروع: ${request.projectName}\n` +
+            `التاريخ: ${new Date().toLocaleString('ar-EG')}\n\n` +
+            `الأصناف المطلوبة:\n\n` +
+            request.items.map(item => 
+                `${item.quantity} ${item.units} من ${item.name}`
+            ).join('\n') +
+            (request.notes ? `\n\nملاحظات:\n${request.notes}` : '') +
+            `\n\nالرجاء تحضير هذه الأصناف للتسليم.`
+        );
+        
+        window.open(`mailto:bajiyof761@cyluna.com?subject=${subject}&body=${body}`);
+        
+        requestDetailsModal.hide();
+        showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
+        loadAllRequests();
+    } catch (error) {
+        showNotification('خطأ', 'فشل في الموافقة على الطلب: ' + error.message);
+    }
 }
 
 function showDeclineReasonModal() {
@@ -521,7 +553,7 @@ function submitDecline() {
     const reason = declineReasonText.value.trim();
     
     if (!reason) {
-        showNotification('Error', 'Please enter a reason for declining');
+        showNotification('خطأ', 'الرجاء إدخال سبب الرفض');
         return;
     }
     
@@ -538,7 +570,7 @@ function submitDecline() {
                 
                 db.collection('notifications').add({
                     userId: currentUser.uid,
-                    message: `Your request for ${request.projectName} has been declined`,
+                    message: `تم رفض طلبك للمشروع ${request.projectName}`,
                     type: 'request_update',
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -547,10 +579,10 @@ function submitDecline() {
         
         declineReasonModal.hide();
         requestDetailsModal.hide();
-        showNotification('Success', 'Request declined and worker notified');
+        showNotification('نجاح', 'تم رفض الطلب وإعلام المستخدم');
         loadAllRequests();
     })
-    .catch(error => showNotification('Error', 'Failed to decline request: ' + error.message));
+    .catch(error => showNotification('خطأ', 'فشل في رفض الطلب: ' + error.message));
 }
 
 // Notification functions
@@ -565,7 +597,7 @@ function setupRealTimeListeners() {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added' && !change.doc.data().read) {
                         const notification = change.doc.data();
-                        showNotification('Notification', notification.message);
+                        showNotification('إشعار', notification.message);
                         change.doc.ref.update({ read: true });
                     }
                 });
@@ -583,7 +615,7 @@ function setupRealTimeListeners() {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added' && !change.doc.data().read) {
                         const notification = change.doc.data();
-                        showNotification('New Request', notification.message);
+                        showNotification('طلب جديد', notification.message);
                         change.doc.ref.update({ read: true });
                     }
                 });
@@ -595,4 +627,32 @@ function showNotification(title, message) {
     toastTitle.textContent = title;
     toastMessage.textContent = message;
     notificationToast.show();
+}
+
+// Mobile UI setup
+function setupMobileUI() {
+    if (!/Mobi|Android/i.test(navigator.userAgent)) return;
+    
+    // Adjust form inputs for mobile
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        el.style.fontSize = '16px';
+    });
+    
+    // Make buttons more touch-friendly
+    document.querySelectorAll('.btn').forEach(btn => {
+        btn.style.padding = '10px 15px';
+        btn.style.minWidth = '80px';
+    });
+    
+    // Adjust table layout
+    document.querySelectorAll('.table-responsive').forEach(table => {
+        table.style.overflowX = 'auto';
+        table.style.webkitOverflowScrolling = 'touch';
+    });
+    
+    // Make modal more mobile-friendly
+    document.querySelectorAll('.modal-dialog').forEach(modal => {
+        modal.style.maxWidth = '95%';
+        modal.style.margin = '10px auto';
+    });
 }
