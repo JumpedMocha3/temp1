@@ -51,3 +51,25 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
 }
+/* Add RTL support */
+body[dir="rtl"] {
+    text-align: right;
+}
+
+body[dir="rtl"] .item-row .form-control {
+    text-align: right;
+}
+
+body[dir="rtl"] .table {
+    direction: rtl;
+}
+
+body[dir="rtl"] .table th {
+    text-align: right;
+}
+
+/* Add this to your existing CSS */
+.arabic-text {
+    font-family: 'Tajawal', sans-serif;
+    direction: rtl;
+}
