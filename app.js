@@ -436,15 +436,23 @@ function viewRequestDetails(requestId) {
 async function generateArabicPDF(request, requestId) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
-        orientation: 'p',
+        orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
     });
 
     // Add Arabic font
-    doc.addFont('https://fonts.googleapis.com/css2?family=Tajawal&display=swap', 'Tajawal', 'normal');
-    doc.setFont('Tajawal');
-    
+    try {
+        const fontUrl = 'https://fonts.googleapis.com/css2?family=Tajawal&display=swap';
+        const fontName = 'Tajawal';
+        
+        // Load font (this is a simplified approach)
+        doc.addFont(fontUrl, fontName, 'normal');
+        doc.setFont(fontName);
+    } catch (e) {
+        console.warn("Font loading failed, using default", e);
+    }
+
     // Set RTL direction
     doc.setR2L(true);
 
@@ -452,33 +460,48 @@ async function generateArabicPDF(request, requestId) {
     doc.setFontSize(18);
     doc.text('أمر شراء', 105, 20, { align: 'center' });
 
-    // Request info
+    // Request info - Right side
     doc.setFontSize(10);
-    doc.text(`رقم الطلب: ${requestId}`, 180, 30, { align: 'right' });
-    doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, 180, 36, { align: 'right' });
-    doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, 180, 42, { align: 'right' });
+    const rightX = 180; // Right-aligned
+    let y = 30;
+    doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
+    y += 6;
+    doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, rightX, y, { align: 'right' });
+    y += 6;
+    doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, rightX, y, { align: 'right' });
 
-    // Requester info
-    doc.text(`مقدم الطلب: ${request.workerName}`, 100, 30, { align: 'right' });
-    doc.text(`البريد الإلكتروني: ${request.workerEmail}`, 100, 36, { align: 'right' });
-    doc.text(`المشروع: ${request.projectName}`, 100, 42, { align: 'right' });
+    // Requester info - Left side
+    const leftX = 20;
+    y = 30;
+    doc.text(`مقدم الطلب: ${request.workerName}`, leftX, y, { align: 'left' });
+    y += 6;
+    doc.text(`البريد الإلكتروني: ${request.workerEmail}`, leftX, y, { align: 'left' });
+    y += 6;
+    doc.text(`المشروع: ${request.projectName}`, leftX, y, { align: 'left' });
 
     // Notes if available
     if (request.notes) {
-        doc.text(`ملاحظات: ${request.notes}`, 180, 50, { align: 'right' });
+        y += 10;
+        doc.text(`ملاحظات: ${request.notes}`, rightX, y, { align: 'right' });
     }
 
-    // Items table (RTL)
+    // Items table
+    const startY = request.notes ? y + 10 : y + 6;
+    
+    // Prepare table data
+    const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
+
+    // Generate table
     doc.autoTable({
-        startY: request.notes ? 60 : 50,
+        startY: startY,
         head: [['الصنف', 'الكمية', 'الوحدة']],
+        body: tableData,
         headStyles: {
             fillColor: [22, 160, 133],
             textColor: [255, 255, 255],
             fontStyle: 'bold',
             halign: 'right'
         },
-        body: request.items.map(item => [item.name, item.quantity, item.units]),
         styles: {
             font: 'Tajawal',
             fontStyle: 'normal',
@@ -486,16 +509,17 @@ async function generateArabicPDF(request, requestId) {
         },
         columnStyles: {
             0: { cellWidth: 'auto', halign: 'right' },
-            1: { cellWidth: 30, halign: 'center' },
-            2: { cellWidth: 30, halign: 'center' }
+            1: { cellWidth: 25, halign: 'center' },
+            2: { cellWidth: 25, halign: 'center' }
         },
-        margin: { right: 10 }
+        margin: { right: 10, left: 10 }
     });
 
     // Approval section
-    doc.text('التوقيع:', 180, doc.lastAutoTable.finalY + 10, { align: 'right' });
-    doc.text('________________________', 180, doc.lastAutoTable.finalY + 20, { align: 'right' });
-    doc.text('ختم المؤسسة', 180, doc.lastAutoTable.finalY + 25, { align: 'right' });
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.text('التوقيع:', rightX, finalY, { align: 'right' });
+    doc.text('________________________', rightX, finalY + 10, { align: 'right' });
+    doc.text('ختم المؤسسة', rightX, finalY + 15, { align: 'right' });
 
     return doc;
 }
@@ -510,8 +534,10 @@ async function approveRequest() {
         
         // Generate PDF
         const pdfDoc = await generateArabicPDF(request, requestId);
+        
+        // Create a blob from the PDF
+        const pdfBlob = pdfDoc.output('blob');
         const pdfName = `طلب_شراء_${requestId}.pdf`;
-        pdfDoc.save(pdfName);
         
         // Update request status
         await db.collection('purchaseRequests').doc(currentRequestId).update({
@@ -520,7 +546,13 @@ async function approveRequest() {
             approvedPdfUrl: pdfName
         });
         
-        // Send email to bajiyof761@cyluna.com
+        // Create download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(pdfBlob);
+        downloadLink.download = pdfName;
+        downloadLink.click();
+        
+        // Send email
         const subject = encodeURIComponent(`طلب شراء جديد #${requestId}`);
         const body = encodeURIComponent(
             `تمت الموافقة على طلب شراء جديد:\n\n` +
@@ -542,6 +574,7 @@ async function approveRequest() {
         showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
         loadAllRequests();
     } catch (error) {
+        console.error('Approval error:', error);
         showNotification('خطأ', 'فشل في الموافقة على الطلب: ' + error.message);
     }
 }
