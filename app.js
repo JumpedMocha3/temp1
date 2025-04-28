@@ -4,7 +4,7 @@ const firebaseConfig = {
   authDomain: "namozag-3b281.firebaseapp.com",
   databaseURL: "https://namozag-3b281-default-rtdb.firebaseio.com",
   projectId: "namozag-3b281",
-  storageBucket: "namozag-3b281.firebasestorage.app",
+  storageBucket: "namozag-3b281.appspot.com",
   messagingSenderId: "183249580094",
   appId: "1:183249580094:web:af1070013478332698616f",
   measurementId: "G-CE1RNHKMQG"
@@ -432,100 +432,122 @@ function viewRequestDetails(requestId) {
         .catch(error => showNotification('خطأ', 'فشل في تحميل تفاصيل الطلب: ' + error.message));
 }
 
-// Arabic PDF Generation
+// Arabic PDF Generation with proper RTL support
 async function generateArabicPDF(request, requestId) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-    });
-
-    // Add Arabic font
     try {
-        const fontUrl = 'https://fonts.googleapis.com/css2?family=Tajawal&display=swap';
-        const fontName = 'Tajawal';
+        // Load jsPDF and plugins
+        const { jsPDF } = window.jspdf;
         
-        // Load font (this is a simplified approach)
-        doc.addFont(fontUrl, fontName, 'normal');
-        doc.setFont(fontName);
-    } catch (e) {
-        console.warn("Font loading failed, using default", e);
+        // Create new PDF document
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        // Set document properties
+        doc.setProperties({
+            title: `طلب شراء ${requestId}`,
+            subject: 'طلب شراء',
+            author: request.workerName,
+            keywords: 'طلب, شراء, مواد',
+            creator: 'نظام إدارة طلبات الشراء'
+        });
+
+        // Add Arabic font (using default font that supports Arabic)
+        // Note: For full Arabic support, you would need to add a custom font
+        // but we'll use the basic approach that works with jsPDF's built-in support
+
+        // Enable RTL
+        doc.setR2L(true);
+
+        // Header
+        doc.setFontSize(18);
+        doc.text('أمر شراء', 105, 20, { align: 'center' });
+
+        // Request info - Right side
+        doc.setFontSize(10);
+        const rightX = 180; // Right-aligned
+        let y = 30;
+        doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
+        y += 6;
+        doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, rightX, y, { align: 'right' });
+        y += 6;
+        doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, rightX, y, { align: 'right' });
+
+        // Requester info - Left side
+        const leftX = 20;
+        y = 30;
+        doc.text(`مقدم الطلب: ${request.workerName}`, leftX, y, { align: 'left' });
+        y += 6;
+        doc.text(`البريد الإلكتروني: ${request.workerEmail}`, leftX, y, { align: 'left' });
+        y += 6;
+        doc.text(`المشروع: ${request.projectName}`, leftX, y, { align: 'left' });
+
+        // Notes if available
+        if (request.notes) {
+            y += 10;
+            // Split notes into multiple lines if too long
+            const splitNotes = doc.splitTextToSize(request.notes, 150);
+            doc.text(`ملاحظات: ${splitNotes}`, rightX, y, { align: 'right', maxWidth: 150 });
+            y += splitNotes.length * 6; // Adjust y position based on number of lines
+        }
+
+        // Items table
+        const startY = request.notes ? y + 10 : y + 6;
+        
+        // Prepare table data
+        const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
+
+        // Generate table with right-to-left support
+        doc.autoTable({
+            startY: startY,
+            head: [['الصنف', 'الكمية', 'الوحدة']],
+            body: tableData,
+            headStyles: {
+                fillColor: [22, 160, 133],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'right'
+            },
+            styles: {
+                halign: 'right',
+                font: 'helvetica',
+                fontStyle: 'normal'
+            },
+            columnStyles: {
+                0: { cellWidth: 'auto', halign: 'right' },
+                1: { cellWidth: 25, halign: 'center' },
+                2: { cellWidth: 25, halign: 'center' }
+            },
+            margin: { right: 10, left: 10 },
+            didDrawPage: function (data) {
+                // Footer
+                doc.setFontSize(10);
+                const pageCount = doc.internal.getNumberOfPages();
+                doc.text(`صفحة ${data.pageNumber} من ${pageCount}`, 105, 285, { align: 'center' });
+            }
+        });
+
+        // Approval section
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.text('التوقيع:', rightX, finalY, { align: 'right' });
+        doc.text('________________________', rightX, finalY + 10, { align: 'right' });
+        doc.text('ختم المؤسسة', rightX, finalY + 15, { align: 'right' });
+
+        return doc;
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        throw new Error('فشل في إنشاء ملف PDF: ' + error.message);
     }
-
-    // Set RTL direction
-    doc.setR2L(true);
-
-    // Header
-    doc.setFontSize(18);
-    doc.text('أمر شراء', 105, 20, { align: 'center' });
-
-    // Request info - Right side
-    doc.setFontSize(10);
-    const rightX = 180; // Right-aligned
-    let y = 30;
-    doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
-    y += 6;
-    doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, rightX, y, { align: 'right' });
-    y += 6;
-    doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, rightX, y, { align: 'right' });
-
-    // Requester info - Left side
-    const leftX = 20;
-    y = 30;
-    doc.text(`مقدم الطلب: ${request.workerName}`, leftX, y, { align: 'left' });
-    y += 6;
-    doc.text(`البريد الإلكتروني: ${request.workerEmail}`, leftX, y, { align: 'left' });
-    y += 6;
-    doc.text(`المشروع: ${request.projectName}`, leftX, y, { align: 'left' });
-
-    // Notes if available
-    if (request.notes) {
-        y += 10;
-        doc.text(`ملاحظات: ${request.notes}`, rightX, y, { align: 'right' });
-    }
-
-    // Items table
-    const startY = request.notes ? y + 10 : y + 6;
-    
-    // Prepare table data
-    const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
-
-    // Generate table
-    doc.autoTable({
-        startY: startY,
-        head: [['الصنف', 'الكمية', 'الوحدة']],
-        body: tableData,
-        headStyles: {
-            fillColor: [22, 160, 133],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'right'
-        },
-        styles: {
-            font: 'Tajawal',
-            fontStyle: 'normal',
-            halign: 'right'
-        },
-        columnStyles: {
-            0: { cellWidth: 'auto', halign: 'right' },
-            1: { cellWidth: 25, halign: 'center' },
-            2: { cellWidth: 25, halign: 'center' }
-        },
-        margin: { right: 10, left: 10 }
-    });
-
-    // Approval section
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.text('التوقيع:', rightX, finalY, { align: 'right' });
-    doc.text('________________________', rightX, finalY + 10, { align: 'right' });
-    doc.text('ختم المؤسسة', rightX, finalY + 15, { align: 'right' });
-
-    return doc;
 }
 
 async function approveRequest() {
     try {
+        if (!currentRequestId) {
+            throw new Error('لا يوجد طلب محدد للموافقة');
+        }
+
         const doc = await db.collection('purchaseRequests').doc(currentRequestId).get();
         if (!doc.exists) throw new Error('الطلب غير موجود');
         
@@ -543,32 +565,48 @@ async function approveRequest() {
         await db.collection('purchaseRequests').doc(currentRequestId).update({
             status: 'approved',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            approvedPdfUrl: pdfName
+            approvedPdfUrl: pdfName,
+            approvedBy: currentUser.email,
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         // Create download link
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(pdfBlob);
         downloadLink.download = pdfName;
+        document.body.appendChild(downloadLink);
         downloadLink.click();
+        document.body.removeChild(downloadLink);
         
-        // Send email
-        const subject = encodeURIComponent(`طلب شراء جديد #${requestId}`);
-        const body = encodeURIComponent(
-            `تمت الموافقة على طلب شراء جديد:\n\n` +
-            `رقم الطلب: ${requestId}\n` +
-            `مقدم الطلب: ${request.workerName}\n` +
-            `المشروع: ${request.projectName}\n` +
-            `التاريخ: ${new Date().toLocaleString('ar-EG')}\n\n` +
-            `الأصناف المطلوبة:\n\n` +
-            request.items.map(item => 
-                `${item.quantity} ${item.units} من ${item.name}`
-            ).join('\n') +
-            (request.notes ? `\n\nملاحظات:\n${request.notes}` : '') +
-            `\n\nالرجاء تحضير هذه الأصناف للتسليم.`
-        );
+        // Send email notification
+        const subject = `طلب شراء #${requestId} - تمت الموافقة`;
+        const body = `
+            تمت الموافقة على طلب شراء جديد:
+            
+            رقم الطلب: ${requestId}
+            مقدم الطلب: ${request.workerName}
+            المشروع: ${request.projectName}
+            التاريخ: ${new Date().toLocaleString('ar-EG')}
+            
+            الأصناف المطلوبة:
+            ${request.items.map(item => `${item.quantity} ${item.units} من ${item.name}`).join('\n')}
+            
+            ${request.notes ? `ملاحظات:\n${request.notes}` : ''}
+            
+            الرجاء تحضير هذه الأصناف للتسليم.
+        `;
         
-        window.open(`mailto:bajiyof761@cyluna.com?subject=${subject}&body=${body}`);
+        // Open email client
+        window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+        
+        // Notify worker
+        await db.collection('notifications').add({
+            userId: currentUser.uid,
+            message: `تمت الموافقة على طلبك للمشروع ${request.projectName}`,
+            type: 'request_approved',
+            read: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
         
         requestDetailsModal.hide();
         showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
@@ -595,7 +633,9 @@ function submitDecline() {
     db.collection('purchaseRequests').doc(currentRequestId).update({
         status: 'declined',
         declineReason: reason,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        declinedBy: currentUser.email,
+        declinedAt: firebase.firestore.FieldValue.serverTimestamp()
     })
     .then(() => {
         // Notify worker
@@ -606,7 +646,7 @@ function submitDecline() {
                 db.collection('notifications').add({
                     userId: currentUser.uid,
                     message: `تم رفض طلبك للمشروع ${request.projectName}`,
-                    type: 'request_update',
+                    type: 'request_declined',
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
