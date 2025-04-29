@@ -49,27 +49,30 @@
     </div>
 
     <div id="app-container" class="container-fluid" style="display: none;">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="#">نظام الشراء</a>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#" id="new-request-link">طلب جديد</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#" id="my-requests-link">طلباتي</a>
-                        </li>
-                        <li class="nav-item" id="admin-requests-item" style="display: none;">
-                            <a class="nav-link" href="#" id="all-requests-link">جميع الطلبات</a>
-                        </li>
-                    </ul>
-                    <span class="navbar-text">
-                        <span id="user-email"></span>
-                        <button class="btn btn-sm btn-outline-light ms-2" id="logout-btn">Logout</button>
-                    </span>
-                </div>
+        <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="#">نظام طلبات الشراء</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+          <a class="nav-link" href="#" id="new-request-link">طلب جديد</a>
+                </li>
+                <li class="nav-item">
+          <a class="nav-link" href="#" id="my-requests-link">طلباتي</a>
+                </li>
+                <li class="nav-item" id="admin-requests-item" style="display: none;">
+          <a class="nav-link" href="#" id="all-requests-link">كل الطلبات</a>
+                </li>
+              </ul>
+              <div class="d-flex">
+                <span id="user-email" class="navbar-text mx-2"></span>
+                <button id="logout-btn" class="btn btn-outline-danger">تسجيل خروج</button>
+              </div>
             </div>
+          </div>
         </nav>
 
         <div class="container mt-4">
