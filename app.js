@@ -610,28 +610,37 @@ async function generateArabicPDF(request, requestId) {
 
 async function approveRequest() {
     try {
-        // Show loading state
-        modalApproveBtn.disabled = true;
-        modalApproveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> جاري التحميل...';
+        if (!currentRequestId) {
+            throw new Error('لا يوجد طلب محدد للموافقة');
+        }
 
-        const requestDoc = await db.collection('purchaseRequests').doc(currentRequestId).get();
-        if (!requestDoc.exists) throw new Error('الطلب غير موجود');
+        // Check if jsPDF is available
+        if (typeof jsPDF === 'undefined') {
+            throw new Error('مكتبة PDF غير محملة بشكل صحيح');
+        }
+
+        const doc = await db.collection('purchaseRequests').doc(currentRequestId).get();
+        if (!doc.exists) throw new Error('الطلب غير موجود');
         
-        const request = requestDoc.data();
+        const request = doc.data();
+        const requestId = doc.id;
         
         // Generate PDF
-        const pdfDoc = await generateArabicPDF(request, currentRequestId);
-        const pdfBlob = pdfDoc.output('blob');
-        const pdfName = `طلب_شراء_${currentRequestId}.pdf`;
+        const pdfDoc = await generateArabicPDF(request, requestId);
         
-        // Update Firestore
-        await requestDoc.ref.update({
+        // Create a blob from the PDF
+        const pdfBlob = pdfDoc.output('blob');
+        const pdfName = `طلب_شراء_${requestId}.pdf`;
+        
+        // Update request status
+        await db.collection('purchaseRequests').doc(currentRequestId).update({
             status: 'approved',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             approvedPdfUrl: pdfName,
-            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            approvedBy: currentUser.email
+            approvedBy: currentUser.email,
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-
+        
         // Create download link
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(pdfBlob);
@@ -639,48 +648,43 @@ async function approveRequest() {
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
-
-        // Prepare email content
-        const subject = `موافقة على طلب شراء - ${request.projectName}`;
+        
+        // Send email notification
+        const subject = `طلب شراء #${requestId} - تمت الموافقة`;
         const body = `
-            السادة فريق المشتريات،
-
-            تمت الموافقة على طلب الشراء التالي:
+            تمت الموافقة على طلب شراء جديد:
             
-            رقم الطلب: ${currentRequestId}
+            رقم الطلب: ${requestId}
             مقدم الطلب: ${request.workerName}
             المشروع: ${request.projectName}
-            تاريخ الطلب: ${request.createdAt.toDate().toLocaleString('ar-EG')}
+            التاريخ: ${new Date().toLocaleString('ar-EG')}
             
             الأصناف المطلوبة:
-            ${request.items.map(item => `- ${item.quantity} ${item.units} من ${item.name}`).join('\n')}
+            ${request.items.map(item => `${item.quantity} ${item.units} من ${item.name}`).join('\n')}
             
-            ${request.notes ? `ملاحظات: ${request.notes}` : ''}
+            ${request.notes ? `ملاحظات:\n${request.notes}` : ''}
             
-            يرجى اتخاذ اللازم.
-            
-            مع خالص التحيات،
-            ${currentUser.email}
+            الرجاء تحضير هذه الأصناف للتسليم.
         `;
-
-        // Encode URI components
-        const encodedSubject = encodeURIComponent(subject);
-        const encodedBody = encodeURIComponent(body);
-
-        // Open email client with pre-filled information
-        const mailtoLink = `mailto:?subject=${encodedSubject}&body=${encodedBody}`;
-        window.open(mailtoLink, '_blank');
-
-        showNotification('نجاح', 'تمت الموافقة على الطلب وإعداد البريد الإلكتروني');
+        
+        // Open email client
+        window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+        
+        // Notify worker
+        await db.collection('notifications').add({
+            userId: currentUser.uid,
+            message: `تمت الموافقة على طلبك للمشروع ${request.projectName}`,
+            type: 'request_approved',
+            read: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
         requestDetailsModal.hide();
+        showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
         loadAllRequests();
-
     } catch (error) {
         console.error('Approval error:', error);
-        showNotification('خطأ', `فشل في الموافقة على الطلب: ${error.message}`);
-    } finally {
-        modalApproveBtn.disabled = false;
-        modalApproveBtn.textContent = 'موافقة';
+        showNotification('خطأ', 'فشل في الموافقة على الطلب: ' + error.message);
     }
 }
 
