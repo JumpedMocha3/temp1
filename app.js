@@ -283,10 +283,10 @@ function addItemRow() {
     row.className = 'item-row row mb-2';
     row.innerHTML = `
         <div class="col-md-3">
-            <input type="number" class="form-control quantity" step="0.001" value="1" placeholder="الكمية" required>
+            <input type="text" class="form-control quantity" placeholder="الكمية" required>
         </div>
         <div class="col-md-3">
-            <input type="text" class="form-control units" value="قطعة" placeholder="الوحدة" required>
+            <input type="text" class="form-control units" placeholder="الوحدة" required>
         </div>
         <div class="col-md-5">
             <input type="text" class="form-control item-name" placeholder="اسم الصنف" required>
