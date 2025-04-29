@@ -161,7 +161,6 @@ function handleAuth(e) {
 function handleRegister() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    const isAdmin = document.getElementById('isAdmin').checked;
     
     if (!email || !password) {
         showNotification('خطأ', 'الرجاء إدخال البريد الإلكتروني وكلمة المرور');
@@ -175,7 +174,7 @@ function handleRegister() {
                 .then(() => {
                     return db.collection('users').doc(userCredential.user.uid).set({
                         email: email,
-                        isAdmin: isAdmin,
+                        isAdmin: false, // All new users are workers
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 });
@@ -524,7 +523,6 @@ function viewRequestDetails(requestId) {
 
 async function generateArabicPDF(request, requestId) {
     try {
-        // Initialize jsPDF
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             orientation: 'portrait',
@@ -532,14 +530,16 @@ async function generateArabicPDF(request, requestId) {
             format: 'a4'
         });
 
-        // Set document properties
-        doc.setProperties({
-            title: `طلب شراء ${requestId}`,
-            subject: 'طلب شراء',
-            author: request.workerName,
-            keywords: 'طلب, شراء, مواد',
-            creator: 'نظام إدارة طلبات الشراء'
-        });
+        // Load Arabic font (make sure the font file is in your project)
+        const fontUrl = 'fonts/Tajawal-Regular.ttf';
+        const fontName = 'Tajawal';
+        
+        // Add the font to jsPDF
+        const fontResponse = await fetch(fontUrl);
+        const fontData = await fontResponse.arrayBuffer();
+        doc.addFileToVFS('Tajawal.ttf', fontData);
+        doc.addFont('Tajawal.ttf', 'Tajawal', 'normal');
+        doc.setFont('Tajawal');
 
         // Enable RTL
         doc.setR2L(true);
@@ -583,7 +583,7 @@ async function generateArabicPDF(request, requestId) {
         // Prepare table data
         const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
 
-        // Generate table
+        // Generate table with Arabic font
         doc.autoTable({
             startY: startY,
             head: [['الصنف', 'الكمية', 'الوحدة']],
@@ -592,17 +592,18 @@ async function generateArabicPDF(request, requestId) {
                 fillColor: [22, 160, 133],
                 textColor: [255, 255, 255],
                 fontStyle: 'bold',
-                halign: 'right'
+                halign: 'right',
+                font: 'Tajawal'
             },
             styles: {
                 halign: 'right',
-                font: 'helvetica',
+                font: 'Tajawal',
                 fontStyle: 'normal'
             },
             columnStyles: {
-                0: { cellWidth: 'auto', halign: 'right' },
-                1: { cellWidth: 25, halign: 'center' },
-                2: { cellWidth: 25, halign: 'center' }
+                0: { cellWidth: 'auto', halign: 'right', font: 'Tajawal' },
+                1: { cellWidth: 25, halign: 'center', font: 'Tajawal' },
+                2: { cellWidth: 25, halign: 'center', font: 'Tajawal' }
             },
             margin: { right: 10, left: 10 },
             didDrawPage: function (data) {
