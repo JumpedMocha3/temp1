@@ -21,9 +21,15 @@ const googleProvider = new firebase.auth.GoogleAuthProvider();
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
+const authForm = document.getElementById('auth-form');
+const loginBtn = document.getElementById('login-btn');
+const registerBtn = document.getElementById('register-btn');
 const googleSignInBtn = document.getElementById('google-signin');
 const logoutBtn = document.getElementById('logout-btn');
 const userEmailSpan = document.getElementById('user-email');
+const isAdminCheckbox = document.getElementById('isAdmin');
+const verifyEmailContainer = document.getElementById('verify-email-container');
+const verifyEmailBtn = document.getElementById('verify-email-btn');
 
 // Navigation
 const newRequestLink = document.getElementById('new-request-link');
@@ -76,8 +82,12 @@ function initApp() {
     document.body.style.fontFamily = "'Tajawal', sans-serif";
     
     // Event listeners
+    authForm.addEventListener('submit', handleAuth);
+    registerBtn.addEventListener('click', handleRegister);
     googleSignInBtn.addEventListener('click', signInWithGoogle);
     logoutBtn.addEventListener('click', handleLogout);
+    verifyEmailBtn.addEventListener('click', verifyEmail);
+    
     newRequestLink.addEventListener('click', showNewRequestSection);
     myRequestsLink.addEventListener('click', showMyRequestsSection);
     allRequestsLink.addEventListener('click', showAllRequestsSection);
@@ -90,12 +100,16 @@ function initApp() {
     // Add first item row
     addItemRow();
 
-    // Setup mobile UI
-    setupMobileUI();
-
     // Auth state listener
     auth.onAuthStateChanged(user => {
         if (user) {
+            // Check if email is verified (only for email/password users)
+            if (user.providerData[0].providerId === 'password' && !user.emailVerified) {
+                auth.signOut();
+                showNotification('تحذير', 'الرجاء التحقق من بريدك الإلكتروني أولاً');
+                return;
+            }
+
             currentUser = user;
             userEmailSpan.textContent = user.email;
             authContainer.style.display = 'none';
@@ -121,37 +135,113 @@ function initApp() {
             currentUser = null;
             authContainer.style.display = 'block';
             appContainer.style.display = 'none';
+            authForm.style.display = 'block';
+            verifyEmailContainer.style.display = 'none';
         }
     });
 }
 
-// Google Sign-In
-async function signInWithGoogle() {
-    try {
-        const result = await auth.signInWithPopup(googleProvider);
-        const user = result.user;
-        
-        // Check if user exists in Firestore
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            // Create new user document
-            await db.collection('users').doc(user.uid).set({
-                name: user.displayName,
-                email: user.email,
-                isAdmin: false, // Default to worker role
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-        
-        showNotification('نجاح', 'تم تسجيل الدخول بنجاح');
-    } catch (error) {
-        console.error('Error signing in with Google:', error);
-        showNotification('خطأ', 'فشل في تسجيل الدخول: ' + error.message);
-    }
+// Authentication functions
+function handleAuth(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            if (!userCredential.user.emailVerified) {
+                sendVerificationEmail(userCredential.user);
+                return;
+            }
+            showNotification('نجاح', 'تم تسجيل الدخول بنجاح');
+        })
+        .catch(error => showNotification('خطأ', error.message));
 }
 
-// Logout
+function handleRegister() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const isAdmin = document.getElementById('isAdmin').checked;
+    
+    if (!email || !password) {
+        showNotification('خطأ', 'الرجاء إدخال البريد الإلكتروني وكلمة المرور');
+        return;
+    }
+    
+    auth.createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+            // Send verification email
+            return sendVerificationEmail(userCredential.user)
+                .then(() => {
+                    return db.collection('users').doc(userCredential.user.uid).set({
+                        email: email,
+                        isAdmin: isAdmin,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+        })
+        .then(() => {
+            showNotification('نجاح', 'تم إنشاء الحساب بنجاح. الرجاء التحقق من بريدك الإلكتروني');
+        })
+        .catch(error => showNotification('خطأ', error.message));
+}
+
+function signInWithGoogle() {
+    auth.signInWithPopup(googleProvider)
+        .then((result) => {
+            const user = result.user;
+            
+            // Check if user exists in Firestore
+            return db.collection('users').doc(user.uid).get()
+                .then(doc => {
+                    if (!doc.exists) {
+                        // Create new user document for Google sign-in
+                        return db.collection('users').doc(user.uid).set({
+                            name: user.displayName,
+                            email: user.email,
+                            isAdmin: false, // Default to worker role for Google sign-ins
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                });
+        })
+        .then(() => {
+            showNotification('نجاح', 'تم تسجيل الدخول بواسطة Google بنجاح');
+        })
+        .catch(error => {
+            console.error('Error signing in with Google:', error);
+            showNotification('خطأ', 'فشل في تسجيل الدخول: ' + error.message);
+        });
+}
+
+function sendVerificationEmail(user) {
+    return user.sendEmailVerification()
+        .then(() => {
+            // Show verification code input
+            authForm.style.display = 'none';
+            verifyEmailContainer.style.display = 'block';
+        })
+        .catch(error => {
+            showNotification('خطأ', 'فشل في إرسال بريد التحقق: ' + error.message);
+        });
+}
+
+function verifyEmail() {
+    const code = document.getElementById('verification-code').value;
+    
+    // In a production app, you would verify the code here
+    // For this example, we'll just reload the user to check verification status
+    auth.currentUser.reload().then(() => {
+        if (auth.currentUser.emailVerified) {
+            showNotification('نجاح', 'تم التحقق من البريد الإلكتروني بنجاح');
+            verifyEmailContainer.style.display = 'none';
+            authForm.style.display = 'block';
+        } else {
+            showNotification('خطأ', 'الرمز غير صحيح أو لم يتم التحقق بعد');
+        }
+    });
+}
+
 function handleLogout() {
     auth.signOut()
         .then(() => showNotification('نجاح', 'تم تسجيل الخروج بنجاح'))
@@ -190,13 +280,13 @@ function showAllRequestsSection(e) {
 // Request form functions
 function addItemRow() {
     const row = document.createElement('div');
-    row.className = 'item-row row';
+    row.className = 'item-row row mb-2';
     row.innerHTML = `
         <div class="col-md-3">
-            <input type="text" class="form-control quantity" placeholder="الكمية" required>
+            <input type="number" class="form-control quantity" step="0.001" value="1" placeholder="الكمية" required>
         </div>
         <div class="col-md-3">
-            <input type="text" class="form-control units" placeholder="الوحدة" required>
+            <input type="text" class="form-control units" value="قطعة" placeholder="الوحدة" required>
         </div>
         <div class="col-md-5">
             <input type="text" class="form-control item-name" placeholder="اسم الصنف" required>
@@ -236,12 +326,12 @@ function submitPurchaseRequest(e) {
     const itemRows = itemsContainer.querySelectorAll('.item-row');
     
     itemRows.forEach(row => {
-        const quantity = row.querySelector('.quantity').value.trim();
+        const quantity = parseFloat(row.querySelector('.quantity').value);
         const units = row.querySelector('.units').value.trim();
         const name = row.querySelector('.item-name').value.trim();
         
-        if (!name || !quantity) {
-            showNotification('خطأ', 'الرجاء ملء جميع حقول الأصناف');
+        if (!name || isNaN(quantity)) {
+            showNotification('خطأ', 'الرجاء ملء جميع حقول الأصناف بشكل صحيح');
             throw new Error('Invalid item data');
         }
         
@@ -432,89 +522,104 @@ function viewRequestDetails(requestId) {
         .catch(error => showNotification('خطأ', 'فشل في تحميل تفاصيل الطلب: ' + error.message));
 }
 
-// Arabic PDF Generation with proper RTL support
 async function generateArabicPDF(request, requestId) {
     try {
-        // Create a temporary div to hold our PDF content
-        const pdfContainer = document.createElement('div');
-        pdfContainer.style.position = 'absolute';
-        pdfContainer.style.left = '-9999px';
-        pdfContainer.style.width = '794px'; // A4 width in pixels (210mm)
-        pdfContainer.style.padding = '20px';
-        pdfContainer.style.fontFamily = 'Tajawal, sans-serif';
-        pdfContainer.style.direction = 'rtl';
-        pdfContainer.style.textAlign = 'right';
-        pdfContainer.style.backgroundColor = '#fff';
-        
-        // Build the HTML content
-        pdfContainer.innerHTML = `
-            <h1 style="text-align: center; margin-bottom: 30px;">أمر شراء</h1>
-            
-            <div style="margin-bottom: 20px;">
-                <p><strong>رقم الطلب:</strong> ${requestId}</p>
-                <p><strong>التاريخ:</strong> ${request.createdAt.toDate().toLocaleDateString('ar-EG')}</p>
-                <p><strong>الوقت:</strong> ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}</p>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <p><strong>مقدم الطلب:</strong> ${request.workerName}</p>
-                <p><strong>البريد الإلكتروني:</strong> ${request.workerEmail}</p>
-                <p><strong>المشروع:</strong> ${request.projectName}</p>
-            </div>
-            
-            ${request.notes ? `
-            <div style="margin-bottom: 20px;">
-                <h3>ملاحظات:</h3>
-                <p>${request.notes}</p>
-            </div>
-            ` : ''}
-            
-            <h3 style="margin-bottom: 15px;">الأصناف المطلوبة:</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-                <thead>
-                    <tr style="background-color: #168572; color: white;">
-                        <th style="padding: 10px; border: 1px solid #ddd;">الصنف</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">الكمية</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">الوحدة</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${request.items.map(item => `
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.units}</td>
-                    </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 50px;">
-                <p>التوقيع: ________________________</p>
-                <p>ختم المؤسسة</p>
-            </div>
-        `;
-        
-        document.body.appendChild(pdfContainer);
-        
-        // Convert to canvas then to PDF
-        const canvas = await html2canvas(pdfContainer, {
-            scale: 2,
-            logging: false,
-            useCORS: true
+        // Initialize jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
         });
+
+        // Set document properties
+        doc.setProperties({
+            title: `طلب شراء ${requestId}`,
+            subject: 'طلب شراء',
+            author: request.workerName,
+            keywords: 'طلب, شراء, مواد',
+            creator: 'نظام إدارة طلبات الشراء'
+        });
+
+        // Enable RTL
+        doc.setR2L(true);
+
+        // Header
+        doc.setFontSize(18);
+        doc.text('أمر شراء', 105, 20, { align: 'center' });
+
+        // Request info - Right side
+        doc.setFontSize(10);
+        const rightX = 180;
+        let y = 30;
+        doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
+        y += 6;
+        doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, rightX, y, { align: 'right' });
+        y += 6;
+        doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, rightX, y, { align: 'right' });
+
+        // Requester info - Left side
+        const leftX = 20;
+        y = 30;
+        doc.text(`مقدم الطلب: ${request.workerName}`, leftX, y, { align: 'left' });
+        y += 6;
+        doc.text(`البريد الإلكتروني: ${request.workerEmail}`, leftX, y, { align: 'left' });
+        y += 6;
+        doc.text(`المشروع: ${request.projectName}`, leftX, y, { align: 'left' });
+
+        // Notes if available
+        if (request.notes) {
+            y += 10;
+            doc.text('ملاحظات:', rightX, y, { align: 'right' });
+            y += 6;
+            const splitNotes = doc.splitTextToSize(request.notes, 150);
+            doc.text(splitNotes, rightX, y, { align: 'right', maxWidth: 150 });
+            y += splitNotes.length * 6;
+        }
+
+        // Items table
+        const startY = request.notes ? y + 10 : y + 6;
         
-        document.body.removeChild(pdfContainer);
-        
-        // Convert canvas to PDF
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 210; // A4 width in mm
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-        return pdf;
-        
+        // Prepare table data
+        const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
+
+        // Generate table
+        doc.autoTable({
+            startY: startY,
+            head: [['الصنف', 'الكمية', 'الوحدة']],
+            body: tableData,
+            headStyles: {
+                fillColor: [22, 160, 133],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'right'
+            },
+            styles: {
+                halign: 'right',
+                font: 'helvetica',
+                fontStyle: 'normal'
+            },
+            columnStyles: {
+                0: { cellWidth: 'auto', halign: 'right' },
+                1: { cellWidth: 25, halign: 'center' },
+                2: { cellWidth: 25, halign: 'center' }
+            },
+            margin: { right: 10, left: 10 },
+            didDrawPage: function (data) {
+                // Footer
+                doc.setFontSize(10);
+                const pageCount = doc.internal.getNumberOfPages();
+                doc.text(`صفحة ${data.pageNumber} من ${pageCount}`, 105, 285, { align: 'center' });
+            }
+        });
+
+        // Approval section
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.text('التوقيع:', rightX, finalY, { align: 'right' });
+        doc.text('________________________', rightX, finalY + 10, { align: 'right' });
+        doc.text('ختم المؤسسة', rightX, finalY + 15, { align: 'right' });
+
+        return doc;
     } catch (error) {
         console.error('PDF generation error:', error);
         throw new Error('فشل في إنشاء ملف PDF: ' + error.message);
@@ -525,6 +630,11 @@ async function approveRequest() {
     try {
         if (!currentRequestId) {
             throw new Error('لا يوجد طلب محدد للموافقة');
+        }
+
+        // Check if jsPDF is available
+        if (typeof jsPDF === 'undefined') {
+            throw new Error('مكتبة PDF غير محملة بشكل صحيح');
         }
 
         const doc = await db.collection('purchaseRequests').doc(currentRequestId).get();
@@ -629,6 +739,11 @@ function submitDecline() {
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // Open email client
+                const subject = encodeURIComponent(`طلب شراء #${currentRequestId} - تم الرفض`);
+                const body = encodeURIComponent(`عزيزي ${request.workerName},\n\nنأسف لإبلاغك بأن طلب الشراء الخاص بمشروع "${request.projectName}" قد تم رفضه.\n\nسبب الرفض: ${reason}\n\nمع أطيب التحيات،\nفريق المشتريات`);
+                window.open(`mailto:${request.workerEmail}?subject=${subject}&body=${body}`);
             });
         
         declineReasonModal.hide();
@@ -683,30 +798,24 @@ function showNotification(title, message) {
     notificationToast.show();
 }
 
-// Mobile UI setup
-function setupMobileUI() {
-    if (!/Mobi|Android/i.test(navigator.userAgent)) return;
+// Mobile menu close when clicking outside
+document.addEventListener('click', function(event) {
+    const navbarCollapse = document.querySelector('.navbar-collapse');
+    const navbarToggler = document.querySelector('.navbar-toggler');
     
-    // Adjust form inputs for mobile
-    document.querySelectorAll('input, textarea, select').forEach(el => {
-        el.style.fontSize = '16px';
+    if (navbarCollapse.classList.contains('show') && 
+        !event.target.closest('.navbar-collapse') && 
+        !event.target.closest('.navbar-toggler')) {
+        navbarToggler.click();
+    }
+});
+
+// Close menu when a nav link is clicked
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+        const navbarToggler = document.querySelector('.navbar-toggler');
+        if (window.getComputedStyle(navbarToggler).display !== 'none') {
+            navbarToggler.click();
+        }
     });
-    
-    // Make buttons more touch-friendly
-    document.querySelectorAll('.btn').forEach(btn => {
-        btn.style.padding = '10px 15px';
-        btn.style.minWidth = '80px';
-    });
-    
-    // Adjust table layout
-    document.querySelectorAll('.table-responsive').forEach(table => {
-        table.style.overflowX = 'auto';
-        table.style.webkitOverflowScrolling = 'touch';
-    });
-    
-    // Make modal more mobile-friendly
-    document.querySelectorAll('.modal-dialog').forEach(modal => {
-        modal.style.maxWidth = '95%';
-        modal.style.margin = '10px auto';
-    });
-}
+});
