@@ -523,6 +523,7 @@ function viewRequestDetails(requestId) {
 
 async function generateArabicPDF(request, requestId) {
     try {
+        // Initialize jsPDF
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
             orientation: 'portrait',
@@ -530,18 +531,15 @@ async function generateArabicPDF(request, requestId) {
             format: 'a4'
         });
 
-        // Load Arabic font (make sure the font file is in your project)
-        const fontUrl = 'fonts/Tajawal-Regular.ttf';
-        const fontName = 'Tajawal';
-        
-        // Add the font to jsPDF
-        const fontResponse = await fetch(fontUrl);
-        const fontData = await fontResponse.arrayBuffer();
-        doc.addFileToVFS('Tajawal.ttf', fontData);
-        doc.addFont('Tajawal.ttf', 'Tajawal', 'normal');
-        doc.setFont('Tajawal');
+        // Set document properties
+        doc.setProperties({
+            title: `طلب شراء ${requestId}`,
+            subject: 'طلب شراء',
+            author: request.workerName,
+            creator: 'نظام إدارة طلبات الشراء'
+        });
 
-        // Enable RTL
+        // Enable RTL support
         doc.setR2L(true);
 
         // Header
@@ -550,7 +548,7 @@ async function generateArabicPDF(request, requestId) {
 
         // Request info - Right side
         doc.setFontSize(10);
-        const rightX = 180;
+        const rightX = 180; // Right-aligned position
         let y = 30;
         doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
         y += 6;
@@ -583,7 +581,7 @@ async function generateArabicPDF(request, requestId) {
         // Prepare table data
         const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
 
-        // Generate table with Arabic font
+        // Generate table (simplified version without font specification)
         doc.autoTable({
             startY: startY,
             head: [['الصنف', 'الكمية', 'الوحدة']],
@@ -592,26 +590,17 @@ async function generateArabicPDF(request, requestId) {
                 fillColor: [22, 160, 133],
                 textColor: [255, 255, 255],
                 fontStyle: 'bold',
-                halign: 'right',
-                font: 'Tajawal'
+                halign: 'right'
             },
             styles: {
-                halign: 'right',
-                font: 'Tajawal',
-                fontStyle: 'normal'
+                halign: 'right'
             },
             columnStyles: {
-                0: { cellWidth: 'auto', halign: 'right', font: 'Tajawal' },
-                1: { cellWidth: 25, halign: 'center', font: 'Tajawal' },
-                2: { cellWidth: 25, halign: 'center', font: 'Tajawal' }
+                0: { cellWidth: 'auto', halign: 'right' },
+                1: { cellWidth: 25, halign: 'center' },
+                2: { cellWidth: 25, halign: 'center' }
             },
-            margin: { right: 10, left: 10 },
-            didDrawPage: function (data) {
-                // Footer
-                doc.setFontSize(10);
-                const pageCount = doc.internal.getNumberOfPages();
-                doc.text(`صفحة ${data.pageNumber} من ${pageCount}`, 105, 285, { align: 'center' });
-            }
+            margin: { right: 10, left: 10 }
         });
 
         // Approval section
@@ -638,21 +627,24 @@ async function approveRequest() {
             throw new Error('مكتبة PDF غير محملة بشكل صحيح');
         }
 
-        const doc = await db.collection('purchaseRequests').doc(currentRequestId).get();
-        if (!doc.exists) throw new Error('الطلب غير موجود');
+        const docRef = db.collection('purchaseRequests').doc(currentRequestId);
+        const docSnap = await docRef.get();
         
-        const request = doc.data();
-        const requestId = doc.id;
+        if (!docSnap.exists) {
+            throw new Error('الطلب غير موجود');
+        }
+        
+        const request = docSnap.data();
         
         // Generate PDF
-        const pdfDoc = await generateArabicPDF(request, requestId);
+        const pdfDoc = await generateArabicPDF(request, currentRequestId);
         
         // Create a blob from the PDF
         const pdfBlob = pdfDoc.output('blob');
-        const pdfName = `طلب_شراء_${requestId}.pdf`;
+        const pdfName = `طلب_شراء_${currentRequestId}.pdf`;
         
         // Update request status
-        await db.collection('purchaseRequests').doc(currentRequestId).update({
+        await docRef.update({
             status: 'approved',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             approvedPdfUrl: pdfName,
@@ -668,39 +660,10 @@ async function approveRequest() {
         downloadLink.click();
         document.body.removeChild(downloadLink);
         
-        // Send email notification
-        const subject = `طلب شراء #${requestId} - تمت الموافقة`;
-        const body = `
-            تمت الموافقة على طلب شراء جديد:
-            
-            رقم الطلب: ${requestId}
-            مقدم الطلب: ${request.workerName}
-            المشروع: ${request.projectName}
-            التاريخ: ${new Date().toLocaleString('ar-EG')}
-            
-            الأصناف المطلوبة:
-            ${request.items.map(item => `${item.quantity} ${item.units} من ${item.name}`).join('\n')}
-            
-            ${request.notes ? `ملاحظات:\n${request.notes}` : ''}
-            
-            الرجاء تحضير هذه الأصناف للتسليم.
-        `;
-        
-        // Open email client
-        window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-        
-        // Notify worker
-        await db.collection('notifications').add({
-            userId: currentUser.uid,
-            message: `تمت الموافقة على طلبك للمشروع ${request.projectName}`,
-            type: 'request_approved',
-            read: false,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        requestDetailsModal.hide();
         showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
+        requestDetailsModal.hide();
         loadAllRequests();
+        
     } catch (error) {
         console.error('Approval error:', error);
         showNotification('خطأ', 'فشل في الموافقة على الطلب: ' + error.message);
