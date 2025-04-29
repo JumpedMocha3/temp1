@@ -435,105 +435,86 @@ function viewRequestDetails(requestId) {
 // Arabic PDF Generation with proper RTL support
 async function generateArabicPDF(request, requestId) {
     try {
-        // Load jsPDF
-        const { jsPDF } = window.jspdf;
+        // Create a temporary div to hold our PDF content
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.position = 'absolute';
+        pdfContainer.style.left = '-9999px';
+        pdfContainer.style.width = '794px'; // A4 width in pixels (210mm)
+        pdfContainer.style.padding = '20px';
+        pdfContainer.style.fontFamily = 'Tajawal, sans-serif';
+        pdfContainer.style.direction = 'rtl';
+        pdfContainer.style.textAlign = 'right';
+        pdfContainer.style.backgroundColor = '#fff';
         
-        // Create new PDF document
-        const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
-
-        // Enable RTL
-        doc.setR2L(true);
-
-        // Add metadata
-        doc.setProperties({
-            title: `طلب شراء ${requestId}`,
-            subject: 'طلب شراء',
-            author: request.workerName,
-            keywords: 'طلب, شراء, مواد',
-            creator: 'نظام إدارة طلبات الشراء'
-        });
-
-        // Header
-        doc.setFontSize(18);
-        doc.text('أمر شراء', 105, 20, { align: 'center' });
-
-        // Request info - Right side
-        doc.setFontSize(10);
-        const rightX = 180; // Right-aligned
-        let y = 30;
-        doc.text(`رقم الطلب: ${requestId}`, rightX, y, { align: 'right' });
-        y += 6;
-        doc.text(`التاريخ: ${request.createdAt.toDate().toLocaleDateString('ar-EG')}`, rightX, y, { align: 'right' });
-        y += 6;
-        doc.text(`الوقت: ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}`, rightX, y, { align: 'right' });
-
-        // Requester info - Left side
-        const leftX = 20;
-        y = 30;
-        doc.text(`مقدم الطلب: ${request.workerName}`, leftX, y, { align: 'left' });
-        y += 6;
-        doc.text(`البريد الإلكتروني: ${request.workerEmail}`, leftX, y, { align: 'left' });
-        y += 6;
-        doc.text(`المشروع: ${request.projectName}`, leftX, y, { align: 'left' });
-
-        // Notes if available
-        if (request.notes) {
-            y += 10;
-            // Split Arabic text properly
-            const splitNotes = doc.splitTextToSize(request.notes, 150);
-            doc.text('ملاحظات:', rightX, y, { align: 'right' });
-            y += 6;
-            doc.text(splitNotes, rightX, y, { align: 'right', maxWidth: 150 });
-            y += splitNotes.length * 6;
-        }
-
-        // Items table
-        const startY = request.notes ? y + 10 : y + 6;
+        // Build the HTML content
+        pdfContainer.innerHTML = `
+            <h1 style="text-align: center; margin-bottom: 30px;">أمر شراء</h1>
+            
+            <div style="margin-bottom: 20px;">
+                <p><strong>رقم الطلب:</strong> ${requestId}</p>
+                <p><strong>التاريخ:</strong> ${request.createdAt.toDate().toLocaleDateString('ar-EG')}</p>
+                <p><strong>الوقت:</strong> ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}</p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <p><strong>مقدم الطلب:</strong> ${request.workerName}</p>
+                <p><strong>البريد الإلكتروني:</strong> ${request.workerEmail}</p>
+                <p><strong>المشروع:</strong> ${request.projectName}</p>
+            </div>
+            
+            ${request.notes ? `
+            <div style="margin-bottom: 20px;">
+                <h3>ملاحظات:</h3>
+                <p>${request.notes}</p>
+            </div>
+            ` : ''}
+            
+            <h3 style="margin-bottom: 15px;">الأصناف المطلوبة:</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background-color: #168572; color: white;">
+                        <th style="padding: 10px; border: 1px solid #ddd;">الصنف</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">الكمية</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">الوحدة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${request.items.map(item => `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.units}</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 50px;">
+                <p>التوقيع: ________________________</p>
+                <p>ختم المؤسسة</p>
+            </div>
+        `;
         
-        // Prepare table data
-        const tableData = request.items.map(item => [item.name, item.quantity, item.units]);
-
-        // Generate table with proper Arabic support
-        doc.autoTable({
-            startY: startY,
-            head: [['الصنف', 'الكمية', 'الوحدة']],
-            body: tableData,
-            headStyles: {
-                fillColor: [22, 160, 133],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'right'
-            },
-            styles: {
-                halign: 'right',
-                font: 'helvetica',
-                fontStyle: 'normal'
-            },
-            columnStyles: {
-                0: { cellWidth: 'auto', halign: 'right' },
-                1: { cellWidth: 25, halign: 'center' },
-                2: { cellWidth: 25, halign: 'center' }
-            },
-            margin: { right: 10, left: 10 },
-            didDrawPage: function (data) {
-                // Arabic page number
-                doc.setFontSize(10);
-                const pageCount = doc.internal.getNumberOfPages();
-                doc.text(`صفحة ${data.pageNumber} من ${pageCount}`, 105, 285, { align: 'center' });
-            }
+        document.body.appendChild(pdfContainer);
+        
+        // Convert to canvas then to PDF
+        const canvas = await html2canvas(pdfContainer, {
+            scale: 2,
+            logging: false,
+            useCORS: true
         });
-
-        // Approval section
-        const finalY = doc.lastAutoTable.finalY + 10;
-        doc.text('التوقيع:', rightX, finalY, { align: 'right' });
-        doc.text('________________________', rightX, finalY + 10, { align: 'right' });
-        doc.text('ختم المؤسسة', rightX, finalY + 15, { align: 'right' });
-
-        return doc;
+        
+        document.body.removeChild(pdfContainer);
+        
+        // Convert canvas to PDF
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210; // A4 width in mm
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        return pdf;
+        
     } catch (error) {
         console.error('PDF generation error:', error);
         throw new Error('فشل في إنشاء ملف PDF: ' + error.message);
