@@ -281,14 +281,17 @@ function addItemRow() {
     const row = document.createElement('div');
     row.className = 'item-row row mb-2';
     row.innerHTML = `
-        <div class="col-md-3">
+        <div class="col-md-2">
             <input type="text" class="form-control quantity" placeholder="الكمية" required>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <input type="text" class="form-control units" placeholder="الوحدة" required>
         </div>
-        <div class="col-md-5">
+        <div class="col-md-4">
             <input type="text" class="form-control item-name" placeholder="اسم الصنف" required>
+        </div>
+        <div class="col-md-3">
+            <input type="text" class="form-control item-notes" placeholder="ملاحظات (اختياري)">
         </div>
         <div class="col-md-1 d-flex align-items-center">
             <button type="button" class="btn btn-danger btn-sm remove-item">X</button>
@@ -328,13 +331,14 @@ function submitPurchaseRequest(e) {
         const quantity = parseFloat(row.querySelector('.quantity').value);
         const units = row.querySelector('.units').value.trim();
         const name = row.querySelector('.item-name').value.trim();
+        const itemNotes = row.querySelector('.item-notes').value.trim();
         
         if (!name || isNaN(quantity)) {
             showNotification('خطأ', 'الرجاء ملء جميع حقول الأصناف بشكل صحيح');
             throw new Error('Invalid item data');
         }
         
-        items.push({ quantity, units, name });
+        items.push({ quantity, units, name, notes: itemNotes });
     });
     
     // Create request
@@ -482,9 +486,9 @@ function viewRequestDetails(requestId) {
             document.getElementById('admin-actions').style.display = isAdmin ? 'block' : 'none';
             
             // Build details HTML
-            let itemsHtml = '<table class="table table-sm"><thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th></tr></thead><tbody>';
+            let itemsHtml = '<table class="table table-sm"><thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th><th>ملاحظات</th></tr></thead><tbody>';
             request.items.forEach(item => {
-                itemsHtml += `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${item.units}</td></tr>`;
+                itemsHtml += `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${item.units}</td><td>${item.notes || '-'}</td></tr>`;
             });
             itemsHtml += '</tbody></table>';
             
@@ -501,7 +505,7 @@ function viewRequestDetails(requestId) {
             
             if (request.notes) {
                 detailsHtml += `
-                    <h5 class="mt-3">ملاحظات</h5>
+                    <h5 class="mt-3">ملاحظات عامة</h5>
                     <p>${request.notes}</p>
                 `;
             }
@@ -552,7 +556,7 @@ async function generateArabicPDF(request, requestId) {
             
             ${request.notes ? `
             <div style="margin-bottom: 20px;">
-                <h3>ملاحظات:</h3>
+                <h3>ملاحظات عامة:</h3>
                 <p>${request.notes}</p>
             </div>
             ` : ''}
@@ -564,6 +568,7 @@ async function generateArabicPDF(request, requestId) {
                         <th style="padding: 10px; border: 1px solid #ddd;">الصنف</th>
                         <th style="padding: 10px; border: 1px solid #ddd;">الكمية</th>
                         <th style="padding: 10px; border: 1px solid #ddd;">الوحدة</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">ملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -572,6 +577,7 @@ async function generateArabicPDF(request, requestId) {
                         <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
                         <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
                         <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.units}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.notes || '-'}</td>
                     </tr>
                     `).join('')}
                 </tbody>
@@ -660,9 +666,9 @@ async function approveRequest() {
             التاريخ: ${new Date().toLocaleString('ar-EG')}
             
             الأصناف المطلوبة:
-            ${request.items.map(item => `${item.quantity} ${item.units} من ${item.name}`).join('\n')}
+            ${request.items.map(item => `${item.quantity} ${item.units} من ${item.name}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}
             
-            ${request.notes ? `ملاحظات:\n${request.notes}` : ''}
+            ${request.notes ? `ملاحظات عامة:\n${request.notes}` : ''}
             
             الرجاء تحضير هذه الأصناف للتسليم.
         `;
