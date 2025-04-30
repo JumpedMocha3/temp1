@@ -67,6 +67,32 @@ body {
     font-style: normal;
 }
 
+/* Item row columns */
+.item-row .col-md-2,
+.item-row .col-md-3,
+.item-row .col-md-4 {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+/* Table styles */
+.table-sm th,
+.table-sm td {
+    padding: 0.3rem;
+    font-size: 0.9rem;
+}
+
+/* PDF table styles */
+.pdf-container table th,
+.pdf-container table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+.pdf-container table th {
+    background-color: #f8f9fa;
+}
+
 /* Mobile responsive styles */
 @media (max-width: 768px) {
     .container {
@@ -82,10 +108,16 @@ body {
         margin: 10px 0;
     }
     
-    .item-row .col-md-3, 
-    .item-row .col-md-5 {
+    .item-row .col-md-2,
+    .item-row .col-md-3,
+    .item-row .col-md-4 {
         padding-left: 5px;
         padding-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .item-row .remove-item {
+        margin-top: 5px;
     }
     
     .btn {
@@ -119,8 +151,6 @@ body {
     font-family: 'Tajawal', sans-serif;
     direction: rtl;
 }
-
-/* ===== ADD THESE NEW FIXES BELOW ===== */
 
 /* Mobile Navigation Fixes */
 .navbar {
@@ -178,11 +208,6 @@ body {
 }
 
 /* Mobile Navigation Fixes */
-.navbar {
-    padding: 0.5rem 1rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
 .navbar-toggler {
     margin-left: auto;
     margin-right: 0;
