@@ -1,7 +1,9 @@
-/* Your current CSS (keep all this) */
 body {
     background-color: #f8f9fa;
     padding-bottom: 60px;
+    font-family: 'Tajawal', sans-serif;
+    text-align: right;
+    direction: rtl;
 }
 
 .card {
@@ -42,6 +44,8 @@ body {
 
 .navbar {
     margin-bottom: 20px;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 #app-container {
@@ -53,20 +57,6 @@ body {
     font-size: 0.75rem;
 }
 
-/* Arabic font and RTL support */
-body {
-    font-family: 'Tajawal', sans-serif;
-    text-align: right;
-    direction: rtl;
-}
-
-@font-face {
-    font-family: 'Tajawal';
-    src: url('fonts/Tajawal-Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-}
-
 /* Item row columns */
 .item-row .col-md-2,
 .item-row .col-md-3,
@@ -76,21 +66,27 @@ body {
 }
 
 /* Table styles */
+.table th,
+.table td {
+    vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+    width: 50px;
+    text-align: center;
+}
+
+#all-requests-table th:nth-child(2),
+#all-requests-table td:nth-child(2) {
+    width: 100px;
+    font-family: monospace;
+}
+
 .table-sm th,
 .table-sm td {
     padding: 0.3rem;
     font-size: 0.9rem;
-}
-
-/* PDF table styles */
-.pdf-container table th,
-.pdf-container table td {
-    padding: 8px;
-    border: 1px solid #ddd;
-}
-
-.pdf-container table th {
-    background-color: #f8f9fa;
 }
 
 /* Mobile responsive styles */
@@ -133,7 +129,7 @@ body {
 
 /* Form inputs */
 .form-control {
-    font-size: 16px; /* Prevent mobile zoom */
+    font-size: 16px;
     text-align: right;
 }
 
@@ -146,18 +142,24 @@ body {
     text-align: right;
 }
 
-/* PDF specific (not shown to users) */
+/* PDF specific */
 .pdf-arabic {
     font-family: 'Tajawal', sans-serif;
     direction: rtl;
 }
 
-/* Mobile Navigation Fixes */
-.navbar {
-    padding: 0.5rem 1rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.pdf-container {
+    font-family: 'Tajawal', sans-serif;
+    direction: rtl;
+    text-align: right;
+    padding: 20px;
+    background-color: white;
+    width: 794px;
+    margin: 0 auto;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
+/* Mobile Navigation Fixes */
 @media (max-width: 991.98px) {
     .navbar-collapse {
         background-color: #f8f9fa;
@@ -174,6 +176,18 @@ body {
     .nav-link {
         padding: 0.75rem;
         border-radius: 0.25rem;
+    }
+    
+    #user-email {
+        display: block;
+        text-align: right;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    #logout-btn {
+        width: 100%;
+        margin-top: 0.5rem;
     }
 }
 
@@ -207,89 +221,18 @@ body {
     display: none;
 }
 
-/* Mobile Navigation Fixes */
-.navbar-toggler {
-    margin-left: auto;
-    margin-right: 0;
+/* Font face for Tajawal */
+@font-face {
+    font-family: 'Tajawal';
+    src: url('fonts/Tajawal-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
 }
 
-@media (max-width: 991.98px) {
-    .navbar-collapse {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        margin-top: 0.5rem;
-        border-radius: 0.25rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .nav-item {
-        margin: 0.25rem 0;
-    }
-    
-    .nav-link {
-        padding: 0.75rem;
-        border-radius: 0.25rem;
-        text-align: right;
-    }
-    
-    #user-email {
-        display: block;
-        text-align: right;
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-    }
-    
-    #logout-btn {
-        width: 100%;
-        margin-top: 0.5rem;
-    }
-}
-
-/* Ensure Tajawal font is properly loaded for PDF */
 @font-face {
     font-family: 'Tajawal';
     font-style: normal;
     font-weight: 400;
     src: url(https://fonts.gstatic.com/s/tajawal/v9/Iurf6YBj_oCad4k1l_6gLrZjiY.woff2) format('woff2');
     unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
-}
-
-/* PDF container styling */
-.pdf-container {
-    font-family: 'Tajawal', sans-serif;
-    direction: rtl;
-    text-align: right;
-    padding: 20px;
-    background-color: white;
-    width: 794px; /* A4 width in pixels */
-    margin: 0 auto;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-
-/* Google Sign-in Button */
-#google-signin {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-/* Verification Container */
-#verify-email-container {
-    background-color: #f8f9fa;
-    padding: 20px;
-    border-radius: 5px;
-    border: 1px solid #dee2e6;
-}
-
-/* Responsive adjustments */
-@media (max-width: 576px) {
-    #auth-container {
-        padding: 15px;
-    }
-    
-    .card {
-        margin: 0;
-        border: none;
-    }
 }
