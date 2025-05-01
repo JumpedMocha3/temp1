@@ -529,11 +529,14 @@ async function approveRequest() {
         const request = doc.data();
         const requestId = doc.id;
         
+        // Generate PDF
         const pdfDoc = await generateArabicPDF(request, requestId);
         
+        // Create a blob from the PDF
         const pdfBlob = pdfDoc.output('blob');
         const pdfName = `طلب_شراء_${request.orderCode}.pdf`;
         
+        // Update request status
         await db.collection('purchaseRequests').doc(currentRequestId).update({
             status: 'approved',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -542,6 +545,7 @@ async function approveRequest() {
             approvedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        // Create download link
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(pdfBlob);
         downloadLink.download = pdfName;
@@ -549,6 +553,7 @@ async function approveRequest() {
         downloadLink.click();
         document.body.removeChild(downloadLink);
         
+        // Prepare email content
         const subject = `طلب شراء #${request.orderCode} - تمت الموافقة`;
         const body = `
             تمت الموافقة على طلب شراء جديد:
@@ -566,8 +571,15 @@ async function approveRequest() {
             الرجاء تحضير هذه الأصناف للتسليم.
         `;
         
-        window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+        // Send email to purchaseorder@4walls-group.com
+        const emailTo = 'purchaseorder@4walls-group.com';
+        const emailSubject = encodeURIComponent(subject);
+        const emailBody = encodeURIComponent(body);
         
+        // Open email client with the purchase order email as recipient
+        window.open(`mailto:${emailTo}?subject=${emailSubject}&body=${emailBody}`);
+        
+        // Also send notification to worker
         await db.collection('notifications').add({
             userId: currentUser.uid,
             message: `تمت الموافقة على طلبك للمشروع ${request.projectName}`,
@@ -577,7 +589,7 @@ async function approveRequest() {
         });
         
         requestDetailsModal.hide();
-        showNotification('نجاح', 'تمت الموافقة على الطلب وتم إنشاء ملف PDF');
+        showNotification('نجاح', 'تمت الموافقة على الطلب وتم إرسال البريد الإلكتروني إلى قسم المشتريات');
         loadAllRequests();
     } catch (error) {
         console.error('Approval error:', error);
