@@ -1,4 +1,4 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA5h26hiZRX2WA3tRCjUY2NlA6rnRV0E24",
   authDomain: "namozag-3b281.firebaseapp.com",
@@ -15,21 +15,13 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Google Auth Provider
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
 const authForm = document.getElementById('auth-form');
 const loginBtn = document.getElementById('login-btn');
-const registerBtn = document.getElementById('register-btn');
-const googleSignInBtn = document.getElementById('google-signin');
 const logoutBtn = document.getElementById('logout-btn');
 const userEmailSpan = document.getElementById('user-email');
-const isAdminCheckbox = document.getElementById('isAdmin');
-const verifyEmailContainer = document.getElementById('verify-email-container');
-const verifyEmailBtn = document.getElementById('verify-email-btn');
 
 // Navigation
 const newRequestLink = document.getElementById('new-request-link');
@@ -73,20 +65,24 @@ let currentUser = null;
 let isAdmin = false;
 let currentRequestId = null;
 
+// Helper function to generate order code
+function generateOrderCode(email, orderNumber) {
+    const paddedNumber = String(orderNumber).padStart(4, '0');
+    const emailPrefix = email.substring(0, 2).toLowerCase();
+    const randomChars = Math.random().toString(36).substring(2, 4);
+    return `${paddedNumber}${emailPrefix}${randomChars}`;
+}
+
 // Initialize the app
 document.addEventListener('DOMContentLoaded', initApp);
 
 function initApp() {
-    // Set RTL and Arabic font
     document.body.setAttribute('dir', 'rtl');
     document.body.style.fontFamily = "'Tajawal', sans-serif";
     
     // Event listeners
     authForm.addEventListener('submit', handleAuth);
-    registerBtn.addEventListener('click', handleRegister);
-    googleSignInBtn.addEventListener('click', signInWithGoogle);
     logoutBtn.addEventListener('click', handleLogout);
-    verifyEmailBtn.addEventListener('click', verifyEmail);
     
     newRequestLink.addEventListener('click', showNewRequestSection);
     myRequestsLink.addEventListener('click', showMyRequestsSection);
@@ -97,19 +93,11 @@ function initApp() {
     modalDeclineBtn.addEventListener('click', showDeclineReasonModal);
     submitDeclineBtn.addEventListener('click', submitDecline);
 
-    // Add first item row
     addItemRow();
 
     // Auth state listener
     auth.onAuthStateChanged(user => {
         if (user) {
-            // Check if email is verified (only for email/password users)
-            if (user.providerData[0].providerId === 'password' && !user.emailVerified) {
-                auth.signOut();
-                showNotification('تحذير', 'الرجاء التحقق من بريدك الإلكتروني أولاً');
-                return;
-            }
-
             currentUser = user;
             userEmailSpan.textContent = user.email;
             authContainer.style.display = 'none';
@@ -129,14 +117,11 @@ function initApp() {
                 }
             });
             
-            // Setup real-time listeners
             setupRealTimeListeners();
         } else {
             currentUser = null;
             authContainer.style.display = 'block';
             appContainer.style.display = 'none';
-            authForm.style.display = 'block';
-            verifyEmailContainer.style.display = 'none';
         }
     });
 }
@@ -148,97 +133,10 @@ function handleAuth(e) {
     const password = document.getElementById('password').value;
     
     auth.signInWithEmailAndPassword(email, password)
-        .then((userCredential) => {
-            if (!userCredential.user.emailVerified) {
-                sendVerificationEmail(userCredential.user);
-                return;
-            }
+        .then(() => {
             showNotification('نجاح', 'تم تسجيل الدخول بنجاح');
         })
         .catch(error => showNotification('خطأ', error.message));
-}
-
-function handleRegister() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    if (!email || !password) {
-        showNotification('خطأ', 'الرجاء إدخال البريد الإلكتروني وكلمة المرور');
-        return;
-    }
-    
-    auth.createUserWithEmailAndPassword(email, password)
-        .then(userCredential => {
-            // Send verification email
-            return sendVerificationEmail(userCredential.user)
-                .then(() => {
-                    return db.collection('users').doc(userCredential.user.uid).set({
-                        email: email,
-                        isAdmin: false, // All new users are workers
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                });
-        })
-        .then(() => {
-            showNotification('نجاح', 'تم إنشاء الحساب بنجاح. الرجاء التحقق من بريدك الإلكتروني');
-        })
-        .catch(error => showNotification('خطأ', error.message));
-}
-
-function signInWithGoogle() {
-    auth.signInWithPopup(googleProvider)
-        .then((result) => {
-            const user = result.user;
-            
-            // Check if user exists in Firestore
-            return db.collection('users').doc(user.uid).get()
-                .then(doc => {
-                    if (!doc.exists) {
-                        // Create new user document for Google sign-in
-                        return db.collection('users').doc(user.uid).set({
-                            name: user.displayName,
-                            email: user.email,
-                            isAdmin: false, // Default to worker role for Google sign-ins
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                });
-        })
-        .then(() => {
-            showNotification('نجاح', 'تم تسجيل الدخول بواسطة Google بنجاح');
-        })
-        .catch(error => {
-            console.error('Error signing in with Google:', error);
-            showNotification('خطأ', 'فشل في تسجيل الدخول: ' + error.message);
-        });
-}
-
-function sendVerificationEmail(user) {
-    return user.sendEmailVerification()
-        .then(() => {
-            // Show verification code input
-            authForm.style.display = 'none';
-            verifyEmailContainer.style.display = 'block';
-        })
-        .catch(error => {
-            showNotification('خطأ', 'فشل في إرسال بريد التحقق: ' + error.message);
-        });
-}
-
-function verifyEmail() {
-    const code = document.getElementById('verification-code').value;
-    
-    // In a production app, you would verify the code here
-    // For this example, we'll just reload the user to check verification status
-    auth.currentUser.reload().then(() => {
-        if (auth.currentUser.emailVerified) {
-            showNotification('نجاح', 'تم التحقق من البريد الإلكتروني بنجاح');
-            verifyEmailContainer.style.display = 'none';
-            authForm.style.display = 'block';
-        } else {
-            showNotification('خطأ', 'الرمز غير صحيح أو لم يتم التحقق بعد');
-        }
-    });
 }
 
 function handleLogout() {
@@ -254,7 +152,6 @@ function showNewRequestSection(e) {
     myRequestsSection.style.display = 'none';
     allRequestsSection.style.display = 'none';
     
-    // Reset form and add first item
     purchaseRequestForm.reset();
     itemsContainer.innerHTML = '';
     addItemRow();
@@ -300,7 +197,6 @@ function addItemRow() {
     
     itemsContainer.appendChild(row);
     
-    // Add remove event listener
     row.querySelector('.remove-item').addEventListener('click', () => {
         if (itemsContainer.children.length > 1) {
             row.remove();
@@ -317,13 +213,11 @@ function submitPurchaseRequest(e) {
     const projectName = document.getElementById('project-name').value.trim();
     const notes = requestNotes.value.trim();
     
-    // Validate inputs
     if (!workerName || !projectName) {
         showNotification('خطأ', 'الرجاء ملء جميع الحقول المطلوبة');
         return;
     }
     
-    // Collect items
     const items = [];
     const itemRows = itemsContainer.querySelectorAll('.item-row');
     
@@ -341,31 +235,36 @@ function submitPurchaseRequest(e) {
         items.push({ quantity, units, name, notes: itemNotes });
     });
     
-    // Create request
-    const request = {
-        workerName,
-        workerEmail: currentUser.email,
-        projectName,
-        items,
-        notes,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    
-    // Save to Firestore
-    db.collection('purchaseRequests').add(request)
-        .then(() => {
-            showNotification('نجاح', 'تم إرسال الطلب بنجاح');
-            purchaseRequestForm.reset();
-            itemsContainer.innerHTML = '';
-            addItemRow();
-            showMyRequestsSection();
-            
-            // Notify admins
-            if (!isAdmin) notifyAdmins(workerName);
-        })
-        .catch(error => showNotification('خطأ', 'فشل في إرسال الطلب: ' + error.message));
+    // Get total count to generate order number
+    db.collection('purchaseRequests').get().then(snapshot => {
+        const orderNumber = snapshot.size + 1;
+        const orderCode = generateOrderCode(currentUser.email, orderNumber);
+        
+        const request = {
+            workerName,
+            workerEmail: currentUser.email,
+            projectName,
+            items,
+            notes,
+            status: 'pending',
+            orderNumber,
+            orderCode,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        return db.collection('purchaseRequests').add(request);
+    })
+    .then(() => {
+        showNotification('نجاح', 'تم إرسال الطلب بنجاح');
+        purchaseRequestForm.reset();
+        itemsContainer.innerHTML = '';
+        addItemRow();
+        showMyRequestsSection();
+        
+        if (!isAdmin) notifyAdmins(workerName);
+    })
+    .catch(error => showNotification('خطأ', 'فشل في إرسال الطلب: ' + error.message));
 }
 
 function notifyAdmins(workerName) {
@@ -385,7 +284,7 @@ function notifyAdmins(workerName) {
 
 // Request management functions
 function loadMyRequests() {
-    myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">جار التحميل...</td></tr>';
+    myRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">جار التحميل...</td></tr>';
     
     db.collection('purchaseRequests')
         .where('workerEmail', '==', currentUser.email)
@@ -393,15 +292,17 @@ function loadMyRequests() {
         .get()
         .then(snapshot => {
             if (snapshot.empty) {
-                myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center">لا توجد طلبات</td></tr>';
+                myRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">لا توجد طلبات</td></tr>';
                 return;
             }
             
             myRequestsTable.innerHTML = '';
+            let counter = 1;
             snapshot.forEach(doc => {
                 const request = doc.data();
                 const row = document.createElement('tr');
                 row.innerHTML = `
+                    <td>${counter}</td>
                     <td>${request.createdAt.toDate().toLocaleString('ar-EG')}</td>
                     <td>${request.projectName}</td>
                     <td>${request.items.length} أصناف</td>
@@ -411,38 +312,40 @@ function loadMyRequests() {
                     </td>
                 `;
                 myRequestsTable.appendChild(row);
+                counter++;
                 
-                // Add event listener
                 row.querySelector('.view-details').addEventListener('click', () => viewRequestDetails(doc.id));
             });
         })
         .catch(error => {
             showNotification('خطأ', 'فشل في تحميل الطلبات: ' + error.message);
-            myRequestsTable.innerHTML = '<tr><td colspan="5" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
+            myRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
         });
 }
 
 function loadAllRequests() {
-    allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">جار التحميل...</td></tr>';
+    allRequestsTable.innerHTML = '<tr><td colspan="7" class="text-center">جار التحميل...</td></tr>';
     
     db.collection('purchaseRequests')
         .orderBy('createdAt', 'desc')
         .get()
         .then(snapshot => {
             if (snapshot.empty) {
-                allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center">لا توجد طلبات</td></tr>';
+                allRequestsTable.innerHTML = '<tr><td colspan="7" class="text-center">لا توجد طلبات</td></tr>';
                 return;
             }
             
             allRequestsTable.innerHTML = '';
+            let counter = 1;
             snapshot.forEach(doc => {
                 const request = doc.data();
                 const row = document.createElement('tr');
                 row.innerHTML = `
+                    <td>${counter}</td>
+                    <td>${request.orderCode}</td>
                     <td>${request.createdAt.toDate().toLocaleString('ar-EG')}</td>
                     <td>${request.workerName} (${request.workerEmail})</td>
                     <td>${request.projectName}</td>
-                    <td>${request.items.length} أصناف</td>
                     <td class="status-${request.status}">${request.status}</td>
                     <td>
                         <button class="btn btn-sm btn-info view-details" data-id="${doc.id}">عرض</button>
@@ -451,8 +354,8 @@ function loadAllRequests() {
                     </td>
                 `;
                 allRequestsTable.appendChild(row);
+                counter++;
                 
-                // Add event listeners
                 row.querySelector('.view-details').addEventListener('click', () => viewRequestDetails(doc.id));
                 const processBtn = row.querySelector('.process-request');
                 if (processBtn) {
@@ -467,7 +370,7 @@ function loadAllRequests() {
         })
         .catch(error => {
             showNotification('خطأ', 'فشل في تحميل الطلبات: ' + error.message);
-            allRequestsTable.innerHTML = '<tr><td colspan="6" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
+            allRequestsTable.innerHTML = '<tr><td colspan="7" class="text-center text-danger">خطأ في تحميل الطلبات</td></tr>';
         });
 }
 
@@ -482,10 +385,8 @@ function viewRequestDetails(requestId) {
             const request = doc.data();
             currentRequestId = requestId;
             
-            // Show/hide admin actions
             document.getElementById('admin-actions').style.display = isAdmin ? 'block' : 'none';
             
-            // Build details HTML
             let itemsHtml = '<table class="table table-sm"><thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th><th>ملاحظات</th></tr></thead><tbody>';
             request.items.forEach(item => {
                 itemsHtml += `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${item.units}</td><td>${item.notes || '-'}</td></tr>`;
@@ -494,7 +395,8 @@ function viewRequestDetails(requestId) {
             
             let detailsHtml = `
                 <h5>طلب من ${request.workerName}</h5>
-                <p><strong>رقم الطلب:</strong> ${doc.id}</p>
+                <p><strong>كود الطلب:</strong> ${request.orderCode}</p>
+                <p><strong>رقم الطلب:</strong> ${request.orderNumber}</p>
                 <p><strong>المشروع:</strong> ${request.projectName}</p>
                 <p><strong>تاريخ الإرسال:</strong> ${request.createdAt.toDate().toLocaleString('ar-EG')}</p>
                 <p><strong>الحالة:</strong> <span class="status-${request.status}">${request.status}</span></p>
@@ -527,23 +429,22 @@ function viewRequestDetails(requestId) {
 
 async function generateArabicPDF(request, requestId) {
     try {
-        // Create a temporary div for PDF content
         const pdfContainer = document.createElement('div');
         pdfContainer.style.position = 'absolute';
         pdfContainer.style.left = '-9999px';
-        pdfContainer.style.width = '794px'; // A4 width in pixels
+        pdfContainer.style.width = '794px';
         pdfContainer.style.padding = '20px';
         pdfContainer.style.fontFamily = 'Tajawal, sans-serif';
         pdfContainer.style.direction = 'rtl';
         pdfContainer.style.textAlign = 'right';
         pdfContainer.style.backgroundColor = '#fff';
         
-        // Build HTML content
         pdfContainer.innerHTML = `
             <h1 style="text-align: center; margin-bottom: 30px;">أمر شراء</h1>
             
             <div style="margin-bottom: 20px;">
-                <p><strong>رقم الطلب:</strong> ${requestId}</p>
+                <p><strong>كود الطلب:</strong> ${request.orderCode}</p>
+                <p><strong>رقم الطلب:</strong> ${request.orderNumber}</p>
                 <p><strong>التاريخ:</strong> ${request.createdAt.toDate().toLocaleDateString('ar-EG')}</p>
                 <p><strong>الوقت:</strong> ${request.createdAt.toDate().toLocaleTimeString('ar-EG')}</p>
             </div>
@@ -591,7 +492,6 @@ async function generateArabicPDF(request, requestId) {
         
         document.body.appendChild(pdfContainer);
         
-        // Convert to canvas then to PDF
         const canvas = await html2canvas(pdfContainer, {
             scale: 2,
             logging: false,
@@ -600,10 +500,9 @@ async function generateArabicPDF(request, requestId) {
         
         document.body.removeChild(pdfContainer);
         
-        // Convert canvas to PDF
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 210; // A4 width in mm
+        const imgWidth = 210;
         const imgHeight = canvas.height * imgWidth / canvas.width;
         
         pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
@@ -620,7 +519,6 @@ async function approveRequest() {
             throw new Error('لا يوجد طلب محدد للموافقة');
         }
 
-        // Check if jsPDF is available
         if (typeof jsPDF === 'undefined') {
             throw new Error('مكتبة PDF غير محملة بشكل صحيح');
         }
@@ -631,14 +529,11 @@ async function approveRequest() {
         const request = doc.data();
         const requestId = doc.id;
         
-        // Generate PDF
         const pdfDoc = await generateArabicPDF(request, requestId);
         
-        // Create a blob from the PDF
         const pdfBlob = pdfDoc.output('blob');
-        const pdfName = `طلب_شراء_${requestId}.pdf`;
+        const pdfName = `طلب_شراء_${request.orderCode}.pdf`;
         
-        // Update request status
         await db.collection('purchaseRequests').doc(currentRequestId).update({
             status: 'approved',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -647,7 +542,6 @@ async function approveRequest() {
             approvedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Create download link
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(pdfBlob);
         downloadLink.download = pdfName;
@@ -655,12 +549,11 @@ async function approveRequest() {
         downloadLink.click();
         document.body.removeChild(downloadLink);
         
-        // Send email notification
-        const subject = `طلب شراء #${requestId} - تمت الموافقة`;
+        const subject = `طلب شراء #${request.orderCode} - تمت الموافقة`;
         const body = `
             تمت الموافقة على طلب شراء جديد:
             
-            رقم الطلب: ${requestId}
+            كود الطلب: ${request.orderCode}
             مقدم الطلب: ${request.workerName}
             المشروع: ${request.projectName}
             التاريخ: ${new Date().toLocaleString('ar-EG')}
@@ -673,10 +566,8 @@ async function approveRequest() {
             الرجاء تحضير هذه الأصناف للتسليم.
         `;
         
-        // Open email client
         window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
         
-        // Notify worker
         await db.collection('notifications').add({
             userId: currentUser.uid,
             message: `تمت الموافقة على طلبك للمشروع ${request.projectName}`,
@@ -715,7 +606,6 @@ function submitDecline() {
         declinedAt: firebase.firestore.FieldValue.serverTimestamp()
     })
     .then(() => {
-        // Notify worker
         db.collection('purchaseRequests').doc(currentRequestId).get()
             .then(doc => {
                 const request = doc.data();
@@ -728,8 +618,7 @@ function submitDecline() {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                // Open email client
-                const subject = encodeURIComponent(`طلب شراء #${currentRequestId} - تم الرفض`);
+                const subject = encodeURIComponent(`طلب شراء #${request.orderCode} - تم الرفض`);
                 const body = encodeURIComponent(`عزيزي ${request.workerName},\n\nنأسف لإبلاغك بأن طلب الشراء الخاص بمشروع "${request.projectName}" قد تم رفضه.\n\nسبب الرفض: ${reason}\n\nمع أطيب التحيات،\nفريق المشتريات`);
                 window.open(`mailto:${request.workerEmail}?subject=${subject}&body=${body}`);
             });
@@ -744,7 +633,6 @@ function submitDecline() {
 
 // Notification functions
 function setupRealTimeListeners() {
-    // Worker notifications
     if (!isAdmin) {
         db.collection('notifications')
             .where('userId', '==', currentUser.uid)
@@ -761,7 +649,6 @@ function setupRealTimeListeners() {
             });
     }
     
-    // Admin notifications for new requests
     if (isAdmin) {
         db.collection('notifications')
             .where('userId', '==', currentUser.uid)
